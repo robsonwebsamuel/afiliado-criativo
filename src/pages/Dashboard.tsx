@@ -19,7 +19,7 @@ const Dashboard = () => {
             Olá, {currentUser.name.split(' ')[0]} 👋
           </h1>
           <p className="text-muted-foreground text-sm">
-            De link a post pronto em segundos.
+            Seu Post Pronto em Segundos
           </p>
         </div>
 
