@@ -3,8 +3,16 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import Index from "./pages/Index.tsx";
-import NotFound from "./pages/NotFound.tsx";
+import Dashboard from "./pages/Dashboard";
+import CreateArt from "./pages/CreateArt";
+import Templates from "./pages/Templates";
+import HistoryPage from "./pages/HistoryPage";
+import CaptionPage from "./pages/CaptionPage";
+import InsertLink from "./pages/InsertLink";
+import ShortenLink from "./pages/ShortenLink";
+import PlansPage from "./pages/PlansPage";
+import HelpPage from "./pages/HelpPage";
+import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
@@ -15,8 +23,15 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/criar" element={<CreateArt />} />
+          <Route path="/templates" element={<Templates />} />
+          <Route path="/historico" element={<HistoryPage />} />
+          <Route path="/legenda" element={<CaptionPage />} />
+          <Route path="/inserir-link" element={<InsertLink />} />
+          <Route path="/encurtar" element={<ShortenLink />} />
+          <Route path="/planos" element={<PlansPage />} />
+          <Route path="/ajuda" element={<HelpPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
