@@ -56,7 +56,7 @@ export const templates: Template[] = [
   { id: 't1', name: 'Destaque Moderno', format: ['feed'], categories: ['geral'], minPlan: 'free', preview: 'from-cyan-500 to-blue-600' },
   { id: 't2', name: 'Promoção Bold', format: ['feed'], categories: ['eletrônicos'], minPlan: 'free', preview: 'from-orange-500 to-red-600' },
   { id: 't3', name: 'Elegância Dark', format: ['feed', 'stories'], categories: ['moda', 'beleza'], minPlan: 'standard', preview: 'from-gray-700 to-gray-900' },
-  { id: 't4', name: 'Energia Vibrante', format: ['feed', 'stories'], categories: ['saúde', 'cursos'], minPlan: 'standard', preview: 'from-green-400 to-emerald-600' },
+  { id: 't4', name: 'Energia Vibrante', format: ['feed', 'stories'], categories: ['saúde', 'cursos'], minPlan: 'standard', preview: 'from-pink-400 to-rose-600' },
   { id: 't5', name: 'Minimalista Clean', format: ['feed', 'stories'], categories: ['geral', 'casa'], minPlan: 'pro', preview: 'from-violet-500 to-purple-700' },
   { id: 't6', name: 'Neon Impact', format: ['feed', 'stories'], categories: ['eletrônicos', 'geral'], minPlan: 'standard', preview: 'from-pink-500 to-rose-600' },
   { id: 't7', name: 'Sunset Glow', format: ['feed', 'stories'], categories: ['moda', 'beleza'], minPlan: 'pro', preview: 'from-amber-400 to-orange-600' },
