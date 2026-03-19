@@ -132,7 +132,7 @@ export const mockExtractedProduct: ExtractedProduct = {
   title: 'Curso Completo de Marketing Digital 2026',
   description: 'Domine as principais estratégias de marketing digital e transforme sua carreira.',
   price: 'R$ 197,90',
-  image: '',
+  image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400&h=400&fit=crop',
   link: 'https://hotmart.com/produto/curso-marketing-digital',
 };
 
