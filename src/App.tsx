@@ -12,6 +12,15 @@ import InsertLink from "./pages/InsertLink";
 import ShortenLink from "./pages/ShortenLink";
 import PlansPage from "./pages/PlansPage";
 import HelpPage from "./pages/HelpPage";
+import ReportsPage from "./pages/ReportsPage";
+import StoresPage from "./pages/StoresPage";
+import SitePage from "./pages/SitePage";
+import AccountPage from "./pages/AccountPage";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminUsers from "./pages/admin/AdminUsers";
+import AdminPlans from "./pages/admin/AdminPlans";
+import AdminTemplates from "./pages/admin/AdminTemplates";
+import AdminIntegrations from "./pages/admin/AdminIntegrations";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,6 +32,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
+          {/* User routes */}
           <Route path="/" element={<Dashboard />} />
           <Route path="/criar" element={<CreateArt />} />
           <Route path="/templates" element={<Templates />} />
@@ -32,6 +42,16 @@ const App = () => (
           <Route path="/encurtar" element={<ShortenLink />} />
           <Route path="/planos" element={<PlansPage />} />
           <Route path="/ajuda" element={<HelpPage />} />
+          <Route path="/relatorios" element={<ReportsPage />} />
+          <Route path="/lojas" element={<StoresPage />} />
+          <Route path="/site" element={<SitePage />} />
+          <Route path="/conta" element={<AccountPage />} />
+          {/* Admin routes */}
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/usuarios" element={<AdminUsers />} />
+          <Route path="/admin/planos" element={<AdminPlans />} />
+          <Route path="/admin/templates" element={<AdminTemplates />} />
+          <Route path="/admin/integracoes" element={<AdminIntegrations />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
