@@ -167,12 +167,17 @@ const CreateArt = () => {
                         }`}
                       >
                         <div className={`absolute inset-0 bg-gradient-to-br ${t.preview}`} />
-                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
-                        <div className="absolute bottom-2 left-2 right-2">
+                        {/* White product area - 80% */}
+                        <div className="absolute inset-[6%] top-[10%] bottom-[10%] bg-white rounded-lg flex flex-col items-center justify-center p-2 gap-1" style={{ height: '80%' }}>
+                          <img src={mockExtractedProduct.image} alt="" className="w-full flex-1 object-cover rounded" />
+                          <p className="text-[7px] font-bold text-gray-800 text-center leading-tight truncate w-full">{titulo}</p>
+                          <span className="text-[8px] font-black text-gray-900">{valor}</span>
+                        </div>
+                        <div className="absolute bottom-1.5 left-2 right-2 z-10">
                           <span className="text-[10px] font-bold text-white bg-black/40 px-1.5 py-0.5 rounded leading-none">{t.name}</span>
                         </div>
                         {selectedTemplateId === t.id && (
-                          <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
+                          <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center z-10">
                             <Check className="w-3 h-3 text-white" />
                           </div>
                         )}
