@@ -14,6 +14,7 @@ import {
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import { currentUser, planLimits } from "@/lib/mock-data";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 import {
   Sidebar,
