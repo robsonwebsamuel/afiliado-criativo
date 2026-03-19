@@ -14,6 +14,7 @@ import {
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import { currentUser, planLimits } from "@/lib/mock-data";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 import {
   Sidebar,
@@ -179,6 +180,9 @@ export function AppSidebar() {
       <SidebarFooter className="border-t border-border/50 p-4">
         {!collapsed && (
           <div className="space-y-3">
+            {/* Theme toggle */}
+            <ThemeToggle collapsed={collapsed} />
+
             {/* Usage bar */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
@@ -209,6 +213,9 @@ export function AppSidebar() {
               </div>
             </div>
           </div>
+        )}
+        {collapsed && (
+          <ThemeToggle collapsed={collapsed} />
         )}
       </SidebarFooter>
     </Sidebar>
