@@ -1,14 +1,16 @@
 import { AppLayout } from "@/components/AppLayout";
-import { currentUser, planLimits, artHistory } from "@/lib/mock-data";
-import { Sparkles, Image, LayoutGrid, History, ArrowRight } from "lucide-react";
+import { currentUser, planLimits, artHistory, planDetails } from "@/lib/mock-data";
+import { Sparkles, Image, LayoutGrid, History, ArrowRight, Crown, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const limit = planLimits[currentUser.plan];
-  const progress = limit.daily === Infinity ? 5 : (currentUser.artsCreatedToday / limit.daily) * 100;
-  const recentArts = artHistory.slice(0, 3);
+  const progress = limit.daily === Infinity ? 10 : (currentUser.artsCreatedToday / limit.daily) * 100;
+  const recentArts = artHistory.slice(0, 5);
+  const plan = planDetails.find(p => p.type === currentUser.plan);
+  const artesDisponiveis = limit.daily === Infinity ? '∞' : limit.daily - currentUser.artsCreatedToday;
 
   return (
     <AppLayout>
@@ -23,28 +25,49 @@ const Dashboard = () => {
           </p>
         </div>
 
-        {/* Stats */}
+        {/* Stats Row — Quadros 2, 3, 4 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Quadro 2 - Total de artes criadas */}
           <StatCard
             icon={<Image className="w-5 h-5 text-primary" />}
-            label="Total de Artes"
+            label="Total de Artes Criadas"
             value={String(currentUser.totalArtsCreated)}
           />
+          {/* Quadro 3 - Artes disponíveis hoje */}
           <StatCard
             icon={<Sparkles className="w-5 h-5 text-primary" />}
-            label="Artes Hoje"
-            value={`${currentUser.artsCreatedToday}/${limit.daily === Infinity ? '∞' : limit.daily}`}
+            label="Artes Disponíveis Hoje"
+            value={`${currentUser.artsCreatedToday} / ${limit.daily === Infinity ? '∞' : limit.daily}`}
+            sub={limit.daily === Infinity ? 'Ilimitadas' : `${artesDisponiveis} restantes`}
             progress={progress}
           />
-          <StatCard
-            icon={<LayoutGrid className="w-5 h-5 text-primary" />}
-            label="Plano Atual"
-            value={currentUser.plan.charAt(0).toUpperCase() + currentUser.plan.slice(1)}
-            badge={currentUser.plan === 'free' ? '4 dias restantes' : undefined}
-          />
+          {/* Quadro 4 - Plano atual */}
+          <div className="rounded-xl bg-surface border border-border/50 p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground uppercase tracking-widest">Plano Atual</span>
+              <LayoutGrid className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex items-end gap-2">
+              <span className="text-2xl font-display font-bold text-foreground tabular-nums capitalize">
+                {currentUser.plan}
+              </span>
+              {currentUser.plan === 'pro' && <Crown className="w-4 h-4 text-accent mb-1" />}
+            </div>
+            {currentUser.plan !== 'pro' && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full text-xs"
+                onClick={() => navigate('/conta')}
+              >
+                <TrendingUp className="w-3 h-3" />
+                Fazer Upgrade
+              </Button>
+            )}
+          </div>
         </div>
 
-        {/* CTA */}
+        {/* Quadro 5 — CTA Criar Arte */}
         <div className="rounded-xl bg-surface border border-border/50 p-8 flex flex-col items-center gap-4 text-center">
           <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center">
             <Sparkles className="w-7 h-7 text-primary" />
@@ -59,15 +82,43 @@ const Dashboard = () => {
           </Button>
         </div>
 
-        {/* Quick links + Recent */}
+        {/* Quadro 1 — Últimos 5 produtos + atalhos */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Quick links */}
+          {/* Quadro 1: Últimos 5 produtos */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-widest">
+              Últimos 5 Produtos Divulgados
+            </h3>
+            <div className="space-y-2">
+              {recentArts.map((art) => (
+                <div
+                  key={art.id}
+                  className="flex items-center gap-4 p-4 rounded-xl bg-surface border border-border/50"
+                >
+                  <div
+                    className="w-10 h-10 rounded-lg shrink-0"
+                    style={{ background: `linear-gradient(135deg, ${art.colors[0]}, ${art.colors[1]})` }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{art.productName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {art.templateName} · {art.format.toUpperCase()}
+                    </p>
+                  </div>
+                  <span className="text-xs text-muted-foreground tabular-nums">{art.createdAt}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Atalhos rápidos */}
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-widest">Atalhos</h3>
             <div className="space-y-2">
               {[
                 { label: 'Templates', desc: 'Explore os templates disponíveis', url: '/templates', icon: LayoutGrid },
                 { label: 'Histórico', desc: 'Veja suas artes criadas', url: '/historico', icon: History },
+                { label: 'Relatórios', desc: 'Acompanhe suas métricas', url: '/relatorios', icon: Sparkles },
               ].map((item) => (
                 <button
                   key={item.url}
@@ -86,45 +137,19 @@ const Dashboard = () => {
               ))}
             </div>
           </div>
-
-          {/* Recent arts */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-widest">Recentes</h3>
-            <div className="space-y-2">
-              {recentArts.map((art) => (
-                <div
-                  key={art.id}
-                  className="flex items-center gap-4 p-4 rounded-xl bg-surface border border-border/50"
-                >
-                  <div
-                    className="w-10 h-10 rounded-lg shrink-0"
-                    style={{
-                      background: `linear-gradient(135deg, ${art.colors[0]}, ${art.colors[1]})`,
-                    }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{art.productName}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {art.templateName} · {art.format.toUpperCase()}
-                    </p>
-                  </div>
-                  <span className="text-xs text-muted-foreground tabular-nums">{art.createdAt}</span>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </AppLayout>
   );
 };
 
-function StatCard({ icon, label, value, progress, badge }: {
+function StatCard({ icon, label, value, progress, badge, sub }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   progress?: number;
   badge?: string;
+  sub?: string;
 }) {
   return (
     <div className="rounded-xl bg-surface border border-border/50 p-5 space-y-3">
@@ -140,6 +165,7 @@ function StatCard({ icon, label, value, progress, badge }: {
           </span>
         )}
       </div>
+      {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
       {progress !== undefined && (
         <div className="h-1.5 bg-elevated rounded-full overflow-hidden">
           <div

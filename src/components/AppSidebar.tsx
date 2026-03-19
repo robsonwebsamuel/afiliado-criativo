@@ -2,15 +2,17 @@ import {
   Sparkles,
   History,
   LayoutGrid,
-  Type,
-  Link2,
-  Scissors,
+  BarChart2,
+  Store,
+  Globe,
   HelpCircle,
   Home,
   Crown,
+  User,
+  ShieldCheck,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { currentUser, planLimits } from "@/lib/mock-data";
 
 import {
@@ -27,19 +29,20 @@ import {
 } from "@/components/ui/sidebar";
 
 const mainItems = [
-  { title: "Dashboard", url: "/", icon: Home },
-  { title: "Criar Nova Arte", url: "/criar", icon: Sparkles },
-  { title: "Histórico", url: "/historico", icon: History },
+  { title: "Início", url: "/", icon: Home },
+  { title: "Relatórios", url: "/relatorios", icon: BarChart2 },
+  { title: "Configurar Lojas", url: "/lojas", icon: Store },
   { title: "Templates", url: "/templates", icon: LayoutGrid },
-  { title: "Gerar Legenda", url: "/legenda", icon: Type },
-  { title: "Inserir Link", url: "/inserir-link", icon: Link2 },
+  { title: "Histórico", url: "/historico", icon: History },
+  { title: "Criar Nova Arte", url: "/criar", icon: Sparkles },
 ];
 
 const proItems = [
-  { title: "Encurtar Link", url: "/encurtar", icon: Scissors },
+  { title: "Meu Site", url: "/site", icon: Globe },
 ];
 
-const helpItems = [
+const accountItems = [
+  { title: "Conta e Assinatura", url: "/conta", icon: User },
   { title: "Ajuda", url: "/ajuda", icon: HelpCircle },
 ];
 
@@ -47,10 +50,13 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const navigate = useNavigate();
   const isActive = (path: string) => location.pathname === path;
 
   const limit = planLimits[currentUser.plan];
-  const progress = Math.min((currentUser.artsCreatedToday / limit.daily) * 100, 100);
+  const progress = limit.daily === Infinity
+    ? 10
+    : Math.min((currentUser.artsCreatedToday / limit.daily) * 100, 100);
   const planLabel = currentUser.plan.charAt(0).toUpperCase() + currentUser.plan.slice(1);
 
   return (
@@ -121,11 +127,11 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
 
-        {/* Help */}
+        {/* Account & Help */}
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {helpItems.map((item) => (
+              {accountItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink
@@ -142,6 +148,31 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Admin section */}
+        {currentUser.role === "admin" && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-muted-foreground uppercase tracking-widest text-xs">
+              Administração
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <NavLink
+                      to="/admin"
+                      className="hover:bg-elevated transition-all duration-200"
+                      activeClassName="bg-elevated text-primary font-medium"
+                    >
+                      <ShieldCheck className="mr-2 h-4 w-4" />
+                      {!collapsed && <span>Painel Admin</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       {/* Footer with user info */}
@@ -159,7 +190,7 @@ export function AppSidebar() {
               <div className="h-1.5 bg-elevated rounded-full overflow-hidden">
                 <div
                   className="h-full bg-primary rounded-full transition-all duration-500"
-                  style={{ width: `${limit.daily === Infinity ? 10 : progress}%` }}
+                  style={{ width: `${progress}%` }}
                 />
               </div>
             </div>
