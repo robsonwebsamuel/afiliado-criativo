@@ -167,12 +167,17 @@ const CreateArt = () => {
                         }`}
                       >
                         <div className={`absolute inset-0 bg-gradient-to-br ${t.preview}`} />
-                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
-                        <div className="absolute bottom-2 left-2 right-2">
+                        {/* White product area - 80% */}
+                        <div className="absolute inset-[6%] top-[10%] bottom-[10%] bg-white rounded-lg flex flex-col items-center justify-center p-2 gap-1" style={{ height: '80%' }}>
+                          <img src={mockExtractedProduct.image} alt="" className="w-full flex-1 object-cover rounded" />
+                          <p className="text-[7px] font-bold text-gray-800 text-center leading-tight truncate w-full">{titulo}</p>
+                          <span className="text-[8px] font-black text-gray-900">{valor}</span>
+                        </div>
+                        <div className="absolute bottom-1.5 left-2 right-2 z-10">
                           <span className="text-[10px] font-bold text-white bg-black/40 px-1.5 py-0.5 rounded leading-none">{t.name}</span>
                         </div>
                         {selectedTemplateId === t.id && (
-                          <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
+                          <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center z-10">
                             <Check className="w-3 h-3 text-white" />
                           </div>
                         )}
@@ -305,21 +310,31 @@ const CreateArt = () => {
             {/* Template Preview */}
             <div className={`rounded-2xl border border-border/50 overflow-hidden shadow-2xl relative ${format === 'stories' ? 'aspect-[9/16]' : 'aspect-square'}`}>
               <div className={`absolute inset-0 bg-gradient-to-br ${selectedTemplate.preview}`} />
-              <div className="absolute inset-0 bg-black/10 backdrop-blur-[2px]" />
-              <div className="absolute inset-0 flex flex-col items-center justify-center px-8 text-center gap-4">
-                <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-white opacity-70">Oferta Especial</span>
-                <h3 className="text-xl font-display font-black text-white leading-tight uppercase tracking-tighter shadow-sm">{titulo}</h3>
-                <div className="bg-white/95 text-black px-4 py-2 rounded-xl">
-                  <span className="text-2xl font-black font-mono">{valor}</span>
-                </div>
-                <div className="mt-4 px-6 py-2 border-2 border-white/50 rounded-full">
-                  <span className="text-xs font-bold text-white uppercase">{cta}</span>
+              {/* Top bar - template branding ~10% */}
+              <div className="absolute top-0 left-0 right-0 h-[10%] flex items-center justify-between px-4 z-10">
+                <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/80">Oferta Especial</span>
+                {currentUser.plan !== 'free' && (
+                  <div className="w-7 h-7 rounded-lg bg-white/20 backdrop-blur-md flex items-center justify-center text-[8px] font-bold text-white">LOGO</div>
+                )}
+              </div>
+              {/* White product area - 80% */}
+              <div className="absolute left-[5%] right-[5%] top-[10%] bg-white rounded-xl flex flex-col items-center justify-center p-4 gap-3 shadow-lg" style={{ height: '80%' }}>
+                <img
+                  src={mockExtractedProduct.image}
+                  alt={titulo}
+                  className="w-full flex-1 object-cover rounded-lg"
+                />
+                <h3 className="text-sm font-display font-black text-gray-900 text-center leading-tight">{titulo}</h3>
+                <div className="bg-gray-100 px-4 py-1.5 rounded-lg">
+                  <span className="text-xl font-black font-mono text-gray-900">{valor}</span>
                 </div>
               </div>
-              {/* Logo placeholder if not pro/standard */}
-              {currentUser.plan !== 'free' && (
-                <div className="absolute top-4 left-4 w-8 h-8 rounded-lg bg-white/20 backdrop-blur-md flex items-center justify-center text-[10px] font-bold text-white">LOGO</div>
-              )}
+              {/* Bottom bar - CTA ~10% */}
+              <div className="absolute bottom-0 left-0 right-0 h-[10%] flex items-center justify-center z-10">
+                <div className="px-5 py-1.5 border-2 border-white/50 rounded-full">
+                  <span className="text-[10px] font-bold text-white uppercase">{cta}</span>
+                </div>
+              </div>
             </div>
 
             {/* Caption Preview */}
