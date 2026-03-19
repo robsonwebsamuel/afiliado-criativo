@@ -77,7 +77,7 @@ const Dashboard = () => {
             Cole o link do produto, escolha um template e gere sua arte em segundos.
           </p>
           <Button size="lg" onClick={() => navigate('/criar')} className="mt-2">
-            <Sparkles className="w-4 h-4" />
+            <MousePointerClick className="w-4 h-4" />
             Começar Agora
           </Button>
         </div>
