@@ -1,6 +1,6 @@
 import { AppLayout } from "@/components/AppLayout";
 import { currentUser, planLimits, artHistory, planDetails } from "@/lib/mock-data";
-import { Sparkles, Image, LayoutGrid, History, ArrowRight, Crown, TrendingUp } from "lucide-react";
+import { Sparkles, Image, LayoutGrid, History, ArrowRight, Crown, TrendingUp, MousePointerClick } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
