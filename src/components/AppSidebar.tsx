@@ -10,11 +10,13 @@ import {
   Crown,
   User,
   ShieldCheck,
+  LogOut,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import { currentUser, planLimits } from "@/lib/mock-data";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useAuth } from "@/contexts/AuthContext";
 
 import {
   Sidebar,
