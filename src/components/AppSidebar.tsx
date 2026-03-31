@@ -54,7 +54,7 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { signOut, isAdmin } = useAuth();
   const isActive = (path: string) => location.pathname === path;
 
   const handleLogout = async () => {
@@ -159,7 +159,7 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {/* Admin section */}
-        {currentUser.role === "admin" && (
+        {isAdmin && (
           <SidebarGroup>
             <SidebarGroupLabel className="text-muted-foreground uppercase tracking-widest text-xs">
               Administração
