@@ -10,11 +10,13 @@ import {
   Crown,
   User,
   ShieldCheck,
+  LogOut,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import { currentUser, planLimits } from "@/lib/mock-data";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useAuth } from "@/contexts/AuthContext";
 
 import {
   Sidebar,
@@ -52,7 +54,13 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
   const navigate = useNavigate();
+  const { signOut } = useAuth();
   const isActive = (path: string) => location.pathname === path;
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/login');
+  };
 
   const limit = planLimits[currentUser.plan];
   const progress = limit.daily === Infinity
@@ -212,10 +220,28 @@ export function AppSidebar() {
                 </div>
               </div>
             </div>
+
+            {/* Logout button */}
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-destructive hover:bg-destructive/10 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Sair
+            </button>
           </div>
         )}
         {collapsed && (
-          <ThemeToggle collapsed={collapsed} />
+          <div className="space-y-2">
+            <ThemeToggle collapsed={collapsed} />
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center p-2 rounded-lg text-destructive hover:bg-destructive/10 transition-colors"
+              title="Sair"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         )}
       </SidebarFooter>
     </Sidebar>

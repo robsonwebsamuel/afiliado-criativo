@@ -1,15 +1,24 @@
 import { AppLayout } from "@/components/AppLayout";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { currentUser, planDetails } from "@/lib/mock-data";
 import { Button } from "@/components/ui/button";
-import { Check, Crown, Upload, User, Mail, CreditCard, Calendar } from "lucide-react";
+import { Check, Crown, Upload, User, Mail, CreditCard, Calendar, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const AccountPage = () => {
   const { toast } = useToast();
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
   const [annual, setAnnual] = useState(false);
   const [name, setName] = useState(currentUser.name);
   const [email, setEmail] = useState(currentUser.email);
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/login');
+  };
 
   const currentPlan = planDetails.find(p => p.type === currentUser.plan)!;
 
@@ -82,6 +91,15 @@ const AccountPage = () => {
               )}
 
               <Button className="w-full" onClick={handleSaveProfile}>Salvar Perfil</Button>
+
+              <Button
+                variant="outline"
+                className="w-full text-destructive border-destructive/30 hover:bg-destructive/10"
+                onClick={handleLogout}
+              >
+                <LogOut className="w-4 h-4" />
+                Sair da conta
+              </Button>
             </div>
           </div>
 
