@@ -95,7 +95,17 @@ const PlansPage = () => {
                   className="w-full"
                   variant={isPro ? 'default' : 'outline'}
                   size="lg"
-                  onClick={() => toast({ title: `Plano ${plan.name} selecionado`, description: 'Redirecionando para o checkout...' })}
+                  onClick={() => {
+                    const checkoutUrls: Record<string, string> = {
+                      standard: 'https://pay.kiwify.com.br/Q3C9tgH',
+                      pro: 'https://pay.kiwify.com.br/NuyBAgP',
+                    };
+                    if (plan.type === 'free') {
+                      toast({ title: 'Plano Grátis ativado', description: 'Você já está no plano gratuito!' });
+                    } else {
+                      window.open(checkoutUrls[plan.type], '_blank');
+                    }
+                  }}
                 >
                   {plan.type === 'free' ? (
                     <><Zap className="w-4 h-4" /> Começar Grátis</>
