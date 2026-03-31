@@ -4,6 +4,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Dashboard from "./pages/Dashboard";
 import CreateArt from "./pages/CreateArt";
 import Templates from "./pages/Templates";
@@ -22,6 +24,10 @@ import AdminUsers from "./pages/admin/AdminUsers";
 import AdminPlans from "./pages/admin/AdminPlans";
 import AdminTemplates from "./pages/admin/AdminTemplates";
 import AdminIntegrations from "./pages/admin/AdminIntegrations";
+import LoginPage from "./pages/LoginPage";
+import SignupPage from "./pages/SignupPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,31 +38,41 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-      <BrowserRouter>
-        <Routes>
-          {/* User routes */}
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/criar" element={<CreateArt />} />
-          <Route path="/templates" element={<Templates />} />
-          <Route path="/historico" element={<HistoryPage />} />
-          <Route path="/legenda" element={<CaptionPage />} />
-          <Route path="/inserir-link" element={<InsertLink />} />
-          <Route path="/encurtar" element={<ShortenLink />} />
-          <Route path="/planos" element={<PlansPage />} />
-          <Route path="/ajuda" element={<HelpPage />} />
-          <Route path="/relatorios" element={<ReportsPage />} />
-          <Route path="/lojas" element={<StoresPage />} />
-          <Route path="/site" element={<SitePage />} />
-          <Route path="/conta" element={<AccountPage />} />
-          {/* Admin routes */}
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/admin/usuarios" element={<AdminUsers />} />
-          <Route path="/admin/planos" element={<AdminPlans />} />
-          <Route path="/admin/templates" element={<AdminTemplates />} />
-          <Route path="/admin/integracoes" element={<AdminIntegrations />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+        <BrowserRouter>
+          <AuthProvider>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/cadastro" element={<SignupPage />} />
+              <Route path="/esqueci-senha" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
+
+              {/* Protected user routes */}
+              <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/criar" element={<ProtectedRoute><CreateArt /></ProtectedRoute>} />
+              <Route path="/templates" element={<ProtectedRoute><Templates /></ProtectedRoute>} />
+              <Route path="/historico" element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
+              <Route path="/legenda" element={<ProtectedRoute><CaptionPage /></ProtectedRoute>} />
+              <Route path="/inserir-link" element={<ProtectedRoute><InsertLink /></ProtectedRoute>} />
+              <Route path="/encurtar" element={<ProtectedRoute><ShortenLink /></ProtectedRoute>} />
+              <Route path="/planos" element={<ProtectedRoute><PlansPage /></ProtectedRoute>} />
+              <Route path="/ajuda" element={<ProtectedRoute><HelpPage /></ProtectedRoute>} />
+              <Route path="/relatorios" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
+              <Route path="/lojas" element={<ProtectedRoute><StoresPage /></ProtectedRoute>} />
+              <Route path="/site" element={<ProtectedRoute><SitePage /></ProtectedRoute>} />
+              <Route path="/conta" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
+
+              {/* Protected admin routes */}
+              <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+              <Route path="/admin/usuarios" element={<ProtectedRoute><AdminUsers /></ProtectedRoute>} />
+              <Route path="/admin/planos" element={<ProtectedRoute><AdminPlans /></ProtectedRoute>} />
+              <Route path="/admin/templates" element={<ProtectedRoute><AdminTemplates /></ProtectedRoute>} />
+              <Route path="/admin/integracoes" element={<ProtectedRoute><AdminIntegrations /></ProtectedRoute>} />
+
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
+        </BrowserRouter>
       </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>
