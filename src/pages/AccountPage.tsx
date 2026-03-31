@@ -91,6 +91,15 @@ const AccountPage = () => {
               )}
 
               <Button className="w-full" onClick={handleSaveProfile}>Salvar Perfil</Button>
+
+              <Button
+                variant="outline"
+                className="w-full text-destructive border-destructive/30 hover:bg-destructive/10"
+                onClick={handleLogout}
+              >
+                <LogOut className="w-4 h-4" />
+                Sair da conta
+              </Button>
             </div>
           </div>
 

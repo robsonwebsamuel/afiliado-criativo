@@ -220,10 +220,28 @@ export function AppSidebar() {
                 </div>
               </div>
             </div>
+
+            {/* Logout button */}
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-destructive hover:bg-destructive/10 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Sair
+            </button>
           </div>
         )}
         {collapsed && (
-          <ThemeToggle collapsed={collapsed} />
+          <div className="space-y-2">
+            <ThemeToggle collapsed={collapsed} />
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center p-2 rounded-lg text-destructive hover:bg-destructive/10 transition-colors"
+              title="Sair"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         )}
       </SidebarFooter>
     </Sidebar>
