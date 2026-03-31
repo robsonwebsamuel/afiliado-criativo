@@ -1,9 +1,11 @@
 import { AppLayout } from "@/components/AppLayout";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { currentUser, planDetails } from "@/lib/mock-data";
 import { Button } from "@/components/ui/button";
-import { Check, Crown, Upload, User, Mail, CreditCard, Calendar } from "lucide-react";
+import { Check, Crown, Upload, User, Mail, CreditCard, Calendar, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const AccountPage = () => {
   const { toast } = useToast();
