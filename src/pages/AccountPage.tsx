@@ -9,9 +9,16 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const AccountPage = () => {
   const { toast } = useToast();
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
   const [annual, setAnnual] = useState(false);
   const [name, setName] = useState(currentUser.name);
   const [email, setEmail] = useState(currentUser.email);
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/login');
+  };
 
   const currentPlan = planDetails.find(p => p.type === currentUser.plan)!;
 
