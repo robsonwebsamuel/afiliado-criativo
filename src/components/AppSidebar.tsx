@@ -159,7 +159,7 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {/* Admin section */}
-        {currentUser.role === "admin" && (
+        {isAdmin && (
           <SidebarGroup>
             <SidebarGroupLabel className="text-muted-foreground uppercase tracking-widest text-xs">
               Administração
