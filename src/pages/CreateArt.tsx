@@ -1,5 +1,6 @@
 import { AppLayout } from "@/components/AppLayout";
-import { useState } from "react";
+import { useState, useRef } from "react";
+import html2canvas from "html2canvas";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +24,7 @@ const CAPTION_STYLES = [
 ];
 
 const CreateArt = () => {
+  const previewRef = useRef<HTMLDivElement>(null);
   const { product, loading: scraping, fetchProduct } = useProductScraper();
   const [link, setLink] = useState('');
   const [currentStep, setCurrentStep] = useState<Step>('link');
@@ -111,6 +113,40 @@ const CreateArt = () => {
     setValor('');
     setManualImageUrl('');
     setCopied(false);
+  }
+
+  async function handleDownload() {
+    const el = previewRef.current;
+    if (!el) return;
+    try {
+      toast.loading("Gerando imagem...", { id: "download" });
+      const canvas = await html2canvas(el, {
+        width: 1080,
+        height: 1920,
+        scale: 1,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: null,
+        onclone: (clonedDoc) => {
+          const clonedEl = clonedDoc.getElementById("template-preview");
+          if (clonedEl) {
+            clonedEl.style.width = "1080px";
+            clonedEl.style.height = "1920px";
+            clonedEl.style.borderRadius = "0";
+            clonedEl.style.border = "none";
+          }
+        },
+      });
+      const dataUrl = canvas.toDataURL("image/png");
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `arte-${Date.now()}.png`;
+      a.click();
+      toast.success("Arte baixada com sucesso!", { id: "download" });
+    } catch (err) {
+      console.error("Download error:", err);
+      toast.error("Erro ao gerar imagem", { id: "download" });
+    }
   }
 
   return (
@@ -338,8 +374,8 @@ const CreateArt = () => {
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
-                    <Button size="lg" className="w-full" onClick={() => toast.success("Arte baixada!")}>
-                      <Download className="w-4 h-4 mr-2" /> Download
+                    <Button size="lg" className="w-full" onClick={handleDownload}>
+                      <Download className="w-4 h-4 mr-2" /> Download PNG
                     </Button>
                     <Button size="lg" variant="outline" className="w-full" onClick={copyCaption}>
                       <Copy className="w-4 h-4 mr-2" /> Legenda
@@ -363,6 +399,7 @@ const CreateArt = () => {
             <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Pré-visualização</h3>
 
             <div
+              ref={previewRef}
               id="template-preview"
               style={{ aspectRatio: '9/16' }}
               className="w-full rounded-2xl border border-border/50 overflow-hidden shadow-2xl relative"
