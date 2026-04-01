@@ -1,5 +1,5 @@
 import { AppLayout } from "@/components/AppLayout";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,6 +33,7 @@ const CreateArt = () => {
   const [caption, setCaption] = useState('');
   const [generatingCaption, setGeneratingCaption] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [lastScrapedLink, setLastScrapedLink] = useState('');
 
   // Editable fields populated from scraping
   const [titulo, setTitulo] = useState('');
@@ -46,18 +47,40 @@ const CreateArt = () => {
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId) || templates[0];
   const displayImage = manualImageUrl || product?.image || '';
 
-  async function handleFetchProduct() {
-    if (!link.trim()) {
-      toast.error("Cole o link do produto primeiro.");
+  async function handleFetchProduct(urlToFetch?: string) {
+    const targetUrl = urlToFetch || link.trim();
+    if (!targetUrl) {
+      if (!urlToFetch) toast.error("Cole o link do produto primeiro.");
       return;
     }
-    const data = await fetchProduct(link.trim());
+    
+    // Avoid double scraping the same link
+    if (targetUrl === lastScrapedLink && product) return;
+
+    const data = await fetchProduct(targetUrl);
     if (data) {
+      setLastScrapedLink(targetUrl);
       setTitulo(data.title);
       setValor(data.price);
       setCurrentStep('template');
     }
   }
+
+  // Auto-fetch on paste
+  useEffect(() => {
+    const isProductUrl = (url: string) => {
+      const trimmed = url.trim();
+      if (trimmed.length < 15) return false;
+      return /amazon\.com|shopee\.com|mercadoli[vb]re\.com|magazineluiza\.com|magalu\.com/i.test(trimmed);
+    };
+
+    if (link && isProductUrl(link) && link !== lastScrapedLink && !scraping) {
+      const timer = setTimeout(() => {
+        handleFetchProduct(link);
+      }, 700); // 700ms debounce
+      return () => clearTimeout(timer);
+    }
+  }, [link, lastScrapedLink, scraping]);
 
   async function handleGenerateCaption() {
     if (!product) return;
@@ -173,7 +196,7 @@ const CreateArt = () => {
                       placeholder="https://..."
                       className="h-12"
                     />
-                    <Button className="w-full" size="lg" onClick={handleFetchProduct} disabled={scraping}>
+                    <Button className="w-full" size="lg" onClick={() => handleFetchProduct()} disabled={scraping}>
                       {scraping ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}
                       Buscar Produto
                     </Button>

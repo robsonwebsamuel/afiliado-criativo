@@ -431,6 +431,45 @@ function extractTitleFromUrl(url: string): string {
   return "";
 }
 
+async function fetchWithFirecrawl(url: string): Promise<{ html: string; finalUrl: string }> {
+  const apiKey = Deno.env.get("FIRECRAWL_API_KEY");
+  if (!apiKey) {
+    console.log("Firecrawl: API key missing, falling back to native fetch");
+    return { html: "", finalUrl: url };
+  }
+
+  try {
+    console.log("Firecrawl: Fetching...", url);
+    const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        url,
+        formats: ["html"],
+        onlyMainContent: false,
+      }),
+    });
+
+    if (!res.ok) {
+        console.log(`Firecrawl failed with status ${res.status}`);
+        return { html: "", finalUrl: url };
+    }
+
+    const data = await res.json();
+    if (data.success && data.data?.html) {
+      console.log("Firecrawl: Success, HTML length:", data.data.html.length);
+      return { html: data.data.html, finalUrl: data.data.metadata?.url || url };
+    }
+    console.log("Firecrawl: Request successful but no HTML returned");
+  } catch (e) {
+    console.log("Firecrawl error:", e);
+  }
+  return { html: "", finalUrl: url };
+}
+
 // ── HTML fetcher with multiple strategies ──
 async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string }> {
   const strategies = [
@@ -641,9 +680,17 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Fallback to HTML scrape
-      const { html, finalUrl } = await fetchHtml(url);
-      console.log("ML HTML length:", html.length);
+      // Try Firecrawl first for ML
+      let { html, finalUrl } = await fetchWithFirecrawl(url);
+
+      if (!html) {
+        // Fallback to native fetch
+        const native = await fetchHtml(url);
+        html = native.html;
+        finalUrl = native.finalUrl;
+      }
+      
+      console.log("ML Scraping strategy completed, HTML length:", html.length);
       
       const meliHtml = extractMeliFromHtml(html);
       console.log("ML HTML extraction:", { title: meliHtml.title?.substring(0, 40), price: meliHtml.price, hasImage: !!meliHtml.image });
