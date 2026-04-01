@@ -29,11 +29,15 @@ function isValidImageUrl(url: string): boolean {
     "fls-na.amazon", "fls-eu.amazon",
     "images-na.ssl-images-amazon.com/images/G/01/x-locale",
     "data:image", "svg+xml",
-    // ML logos and non-product images
+    // ML non-product images
     "mercadolibre.com/org-img", "mercadolivre.com/org-img",
     "meli-incubator", "frontend-assets",
-    "/nav-header", "/logo", "/favicon",
+    "/nav-header", "/favicon",
+    // ML handshake/logo
+    "/logo", "mercadopago", "logo-mercadolibre",
   ];
+  // Extra check: reject very small images from mlstatic that are logos
+  if (url.includes("mlstatic") && (url.includes("/resources/") || url.includes("/org-img/"))) return false;
   return !blacklist.some(b => url.toLowerCase().includes(b));
 }
 
