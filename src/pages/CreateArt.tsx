@@ -1,17 +1,17 @@
 import { AppLayout } from "@/components/AppLayout";
-import { useState, useRef } from "react";
-import html2canvas from "html2canvas";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Link2, Sparkles, Copy, RefreshCw, Download, Check, Loader2, ArrowLeft, ArrowRight, ExternalLink } from "lucide-react";
+import { Link2, Sparkles, Copy, RefreshCw, Check, Loader2, ArrowLeft, ArrowRight, ExternalLink } from "lucide-react";
 import { useProductScraper } from "@/hooks/useProductScraper";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { templates } from "@/lib/mock-data";
 import { formatPrice } from "@/lib/formatPrice";
+import { DownloadArtButton } from "@/components/DownloadArtButton";
 
 type Step = 'link' | 'template' | 'caption' | 'download';
 
@@ -24,7 +24,6 @@ const CAPTION_STYLES = [
 ];
 
 const CreateArt = () => {
-  const previewRef = useRef<HTMLDivElement>(null);
   const { product, loading: scraping, fetchProduct } = useProductScraper();
   const [link, setLink] = useState('');
   const [currentStep, setCurrentStep] = useState<Step>('link');
@@ -115,39 +114,6 @@ const CreateArt = () => {
     setCopied(false);
   }
 
-  async function handleDownload() {
-    const el = previewRef.current;
-    if (!el) return;
-    try {
-      toast.loading("Gerando imagem...", { id: "download" });
-      const canvas = await html2canvas(el, {
-        width: 1080,
-        height: 1920,
-        scale: 1,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: null,
-        onclone: (clonedDoc) => {
-          const clonedEl = clonedDoc.getElementById("template-preview");
-          if (clonedEl) {
-            clonedEl.style.width = "1080px";
-            clonedEl.style.height = "1920px";
-            clonedEl.style.borderRadius = "0";
-            clonedEl.style.border = "none";
-          }
-        },
-      });
-      const dataUrl = canvas.toDataURL("image/png");
-      const a = document.createElement("a");
-      a.href = dataUrl;
-      a.download = `arte-${Date.now()}.png`;
-      a.click();
-      toast.success("Arte baixada com sucesso!", { id: "download" });
-    } catch (err) {
-      console.error("Download error:", err);
-      toast.error("Erro ao gerar imagem", { id: "download" });
-    }
-  }
 
   return (
     <AppLayout>
@@ -373,16 +339,20 @@ const CreateArt = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
-                    <Button size="lg" className="w-full" onClick={handleDownload}>
-                      <Download className="w-4 h-4 mr-2" /> Download PNG
-                    </Button>
-                    <Button size="lg" variant="outline" className="w-full" onClick={copyCaption}>
-                      <Copy className="w-4 h-4 mr-2" /> Legenda
-                    </Button>
-                    <Button size="lg" variant="outline" className="w-full col-span-2" onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(caption)}`, '_blank')}>
-                      <ExternalLink className="w-4 h-4 mr-2" /> WhatsApp
-                    </Button>
+                  <div className="flex flex-col gap-4 w-full max-w-sm">
+                    <DownloadArtButton
+                      productName={titulo}
+                      price={valor}
+                      elementId="template-preview"
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <Button size="lg" variant="outline" className="w-full" onClick={copyCaption}>
+                        <Copy className="w-4 h-4 mr-2" /> Legenda
+                      </Button>
+                      <Button size="lg" variant="outline" className="w-full" onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(caption)}`, '_blank')}>
+                        <ExternalLink className="w-4 h-4 mr-2" /> WhatsApp
+                      </Button>
+                    </div>
                   </div>
 
                   <Button variant="ghost" size="sm" onClick={handleReset}>
@@ -399,7 +369,6 @@ const CreateArt = () => {
             <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Pré-visualização</h3>
 
             <div
-              ref={previewRef}
               id="template-preview"
               style={{ aspectRatio: '9/16' }}
               className="w-full rounded-2xl border border-border/50 overflow-hidden shadow-2xl relative"
@@ -414,7 +383,7 @@ const CreateArt = () => {
               {/* Centro – 50% imagem */}
               <div className="absolute left-[5%] right-[5%] top-[20%] h-[50%] bg-white rounded-xl flex items-center justify-center p-4 shadow-lg">
                 {displayImage ? (
-                  <img src={displayImage} alt={titulo} className="max-h-full max-w-full object-contain rounded-lg drop-shadow-2xl" />
+                  <img src={displayImage} alt={titulo} crossOrigin="anonymous" className="max-h-full max-w-full object-contain rounded-lg drop-shadow-2xl" />
                 ) : (
                   <div className="w-full h-full bg-muted rounded-lg flex items-center justify-center text-muted-foreground text-sm">
                     Imagem do Produto
