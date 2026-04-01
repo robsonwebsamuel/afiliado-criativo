@@ -36,11 +36,13 @@ const CreateArt = () => {
   const [titulo, setTitulo] = useState('');
   const [valor, setValor] = useState('');
   const [cta, setCta] = useState('Acesse agora e aproveite!');
+  const [manualImageUrl, setManualImageUrl] = useState('');
 
   const stepOrder: Step[] = ['link', 'template', 'caption', 'download'];
   const stepIndex = stepOrder.indexOf(currentStep);
 
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId) || templates[0];
+  const displayImage = manualImageUrl || product?.image || '';
 
   async function handleFetchProduct() {
     if (!link.trim()) {
@@ -106,6 +108,7 @@ const CreateArt = () => {
     setCaption('');
     setTitulo('');
     setValor('');
+    setManualImageUrl('');
     setCopied(false);
   }
 
@@ -190,8 +193,8 @@ const CreateArt = () => {
                   {product && (
                     <Card className="border-primary/20 bg-primary/5">
                       <CardContent className="p-4 flex gap-4 items-center">
-                        {product.image && (
-                          <img src={product.image} alt={product.title} className="w-16 h-16 rounded-lg object-cover" />
+                        {displayImage && (
+                          <img src={displayImage} alt={product.title} className="w-16 h-16 rounded-lg object-cover" />
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-foreground truncate">{product.title}</p>
@@ -215,8 +218,8 @@ const CreateArt = () => {
                       >
                         <div className={`absolute inset-0 bg-gradient-to-br ${t.preview}`} />
                         <div className="absolute inset-[6%] top-[10%] bottom-[10%] bg-white rounded-lg flex flex-col items-center justify-center p-2 gap-1" style={{ height: '80%' }}>
-                          {product?.image ? (
-                            <img src={product.image} alt="" className="w-full flex-1 object-cover rounded" />
+                          {displayImage ? (
+                            <img src={displayImage} alt="" className="w-full flex-1 object-cover rounded" />
                           ) : (
                             <div className="w-full flex-1 bg-muted rounded" />
                           )}
@@ -245,6 +248,10 @@ const CreateArt = () => {
                       <label className="text-xs text-muted-foreground uppercase">Preço</label>
                       <Input value={valor} onChange={e => setValor(e.target.value)} />
                     </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground uppercase">URL da Imagem (opcional, caso não carregue)</label>
+                    <Input value={manualImageUrl} onChange={e => setManualImageUrl(e.target.value)} placeholder="https://..." />
                   </div>
 
                   <div className="pt-4 flex justify-between">
@@ -353,8 +360,8 @@ const CreateArt = () => {
               </div>
               {/* Product area */}
               <div className="absolute left-[5%] right-[5%] top-[10%] bg-white rounded-xl flex flex-col items-center justify-center p-4 gap-3 shadow-lg" style={{ height: '80%' }}>
-                {product?.image ? (
-                  <img src={product.image} alt={titulo} className="w-full flex-1 object-cover rounded-lg" />
+                {displayImage ? (
+                  <img src={displayImage} alt={titulo} className="w-full flex-1 object-cover rounded-lg" />
                 ) : (
                   <div className="w-full flex-1 bg-muted rounded-lg flex items-center justify-center text-muted-foreground text-sm">
                     Imagem do Produto
