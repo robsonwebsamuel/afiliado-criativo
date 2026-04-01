@@ -36,6 +36,7 @@ const CreateArt = () => {
   const [titulo, setTitulo] = useState('');
   const [valor, setValor] = useState('');
   const [cta, setCta] = useState('Acesse agora e aproveite!');
+  const [manualImageUrl, setManualImageUrl] = useState('');
 
   const stepOrder: Step[] = ['link', 'template', 'caption', 'download'];
   const stepIndex = stepOrder.indexOf(currentStep);
