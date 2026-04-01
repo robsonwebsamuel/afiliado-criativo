@@ -432,6 +432,7 @@ async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string 
 
   for (const strategy of strategies) {
     try {
+      console.log(`Trying strategy with UA: ${strategy.ua.substring(0, 30)}...`);
       const res = await fetch(url, {
         headers: {
           "User-Agent": strategy.ua,
@@ -439,25 +440,33 @@ async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string 
           "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
           "Accept-Encoding": "identity",
           "Cache-Control": "no-cache",
-          "Sec-Fetch-Dest": "document",
-          "Sec-Fetch-Mode": "navigate",
-          "Sec-Fetch-Site": "none",
-          "Sec-Fetch-User": "?1",
-          "Upgrade-Insecure-Requests": "1",
           ...strategy.extra,
         },
         redirect: "follow",
       });
-      const text = await res.text();
+
       finalUrl = res.url || url;
+      
+      if (!res.ok) {
+        console.log(`Fetch failed with status ${res.status} for strategy`);
+        continue;
+      }
+
+      const text = await res.text();
       
       // Check if we got a captcha/block page
       if (isJunkTitle(text.substring(0, 500)) && bestHtml.length > text.length) {
+        console.log("Junk title detected, skipping strategy");
         continue;
       }
       
-      if (text.length > bestHtml.length) bestHtml = text;
-      if (bestHtml.length > 10000) break; // Good enough
+      if (text.length > bestHtml.length) {
+        bestHtml = text;
+      }
+      
+      if (bestHtml.length > 5000 && !isJunkTitle(text.substring(0, 500))) {
+        break; // Found a good enough page
+      }
     } catch (e) {
       console.log("Fetch strategy failed:", e);
       continue;
@@ -675,15 +684,38 @@ Deno.serve(async (req) => {
 
     console.log("Scraped:", { title: title.substring(0, 60), hasImage: !!image, price, hasJsonLd: !!jsonLd, site: new URL(url).hostname });
 
+    // ── Final Fallback ──
+    const finalTitle = title || cleanTitle(extractTitleFromUrl(url) || "Produto");
+    
     return new Response(
-      JSON.stringify({ title, image, description, price, url: finalUrl }),
+      JSON.stringify({ 
+        title: finalTitle, 
+        image: image || "", 
+        description: description || "", 
+        price: price || "", 
+        url: finalUrl 
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
     console.error("fetch-product error:", e);
-    return new Response(JSON.stringify({ error: String(e) }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    // Even on error, try to return at least the URL and a guessed title
+    try {
+      const { url } = await req.json();
+      return new Response(JSON.stringify({ 
+        title: cleanTitle(extractTitleFromUrl(url) || "Produto"),
+        image: "",
+        description: "",
+        price: "",
+        url: url
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch {
+      return new Response(JSON.stringify({ error: String(e) }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
   }
 });

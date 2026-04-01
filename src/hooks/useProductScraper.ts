@@ -47,12 +47,27 @@ export function useProductScraper() {
       };
 
       setProduct(productData);
-      toast.success("Produto carregado com sucesso!");
+      
+      if (!data.image) {
+        toast.warning("Dados carregados, mas não conseguimos encontrar a imagem. Você pode inserir o link da imagem manualmente.");
+      } else {
+        toast.success("Produto carregado com sucesso!");
+      }
+      
       return productData;
     } catch (e) {
       console.error("Error fetching product:", e);
-      toast.error("Não foi possível carregar o produto. Verifique o link.");
-      return null;
+      // Fallback for absolute failure
+      const fallbackData: ProductData = {
+        title: "Produto",
+        image: "",
+        description: "",
+        price: "",
+        url: url,
+      };
+      setProduct(fallbackData);
+      toast.info("Não foi possível extrair os dados automaticamente. Por favor, preencha os campos manualmente.");
+      return fallbackData;
     } finally {
       setLoading(false);
     }
