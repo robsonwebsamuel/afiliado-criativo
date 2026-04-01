@@ -8,41 +8,27 @@ const corsHeaders = {
 
 function decodeHtmlEntities(text: string): string {
   return text
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/&#x27;/g, "'")
-    .replace(/&#x2F;/g, "/")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&NegativeMediumSpace;/g, "")
-    .replace(/&NegativeThickSpace;/g, "")
-    .replace(/&NegativeThinSpace;/g, "")
-    .replace(/&NegativeVeryThinSpace;/g, "")
-    .replace(/&ZeroWidthSpace;/g, "")
-    .replace(/&thinsp;/g, " ")
-    .replace(/&ensp;/g, " ")
-    .replace(/&emsp;/g, " ")
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&apos;/g, "'")
+    .replace(/&#x27;/g, "'").replace(/&#x2F;/g, "/").replace(/&nbsp;/g, " ")
+    .replace(/&(Negative|ZeroWidth)\w*Space;/g, "")
+    .replace(/&(thin|en|em)sp;/g, " ")
     .replace(/&#\d+;/g, (m) => String.fromCharCode(parseInt(m.slice(2, -1))))
     .replace(/&#x[0-9a-fA-F]+;/g, (m) => String.fromCharCode(parseInt(m.slice(3, -1), 16)))
-    .replace(/&[a-zA-Z]+;/g, "") // Remove any remaining named entities
+    .replace(/&[a-zA-Z]+;/g, "")
     .replace(/\s{2,}/g, " ")
     .trim();
 }
 
 function isValidImageUrl(url: string): boolean {
   if (!url) return false;
-  // Filter out tracking pixels, 1x1 images, analytics URLs
   const blacklist = [
     "uedata", "pixel", "beacon", "tracking", "analytics",
     "1x1", "spacer", "blank", "transparent", "logo", "icon",
     "sprite", "badge", "fls-na.amazon", "fls-eu.amazon",
     "images-na.ssl-images-amazon.com/images/G/01/x-locale",
   ];
-  const lower = url.toLowerCase();
-  return !blacklist.some(b => lower.includes(b));
+  return !blacklist.some(b => url.toLowerCase().includes(b));
 }
 
 function extractJsonLd(html: string): Record<string, any> | null {
@@ -54,22 +40,15 @@ function extractJsonLd(html: string): Record<string, any> | null {
       const parsed = JSON.parse(json);
       const items = Array.isArray(parsed) ? parsed : [parsed];
       for (const item of items) {
-        if (item["@type"] === "Product" || item["@type"]?.includes?.("Product")) {
-          return item;
-        }
-        // Check @graph
+        if (item["@type"] === "Product" || item["@type"]?.includes?.("Product")) return item;
         if (item["@graph"]) {
           for (const g of item["@graph"]) {
-            if (g["@type"] === "Product" || g["@type"]?.includes?.("Product")) {
-              return g;
-            }
+            if (g["@type"] === "Product" || g["@type"]?.includes?.("Product")) return g;
           }
         }
       }
     }
-  } catch {
-    // ignore
-  }
+  } catch { /* */ }
   return null;
 }
 
@@ -81,9 +60,7 @@ function extractPriceFromJsonLd(jsonLd: Record<string, any>): string {
     const price = offer?.price || offer?.lowPrice;
     if (price) {
       const num = parseFloat(String(price).replace(",", "."));
-      if (!isNaN(num)) {
-        return `R$ ${num.toFixed(2).replace(".", ",")}`;
-      }
+      if (!isNaN(num)) return `R$ ${num.toFixed(2).replace(".", ",")}`;
     }
   } catch { /* */ }
   return "";
@@ -93,9 +70,7 @@ function extractImagesFromJsonLd(jsonLd: Record<string, any>): string[] {
   try {
     const img = jsonLd.image;
     if (typeof img === "string") return [img];
-    if (Array.isArray(img)) {
-      return img.map((i: any) => typeof i === "string" ? i : i?.url || i?.contentUrl || "").filter(Boolean);
-    }
+    if (Array.isArray(img)) return img.map((i: any) => typeof i === "string" ? i : i?.url || i?.contentUrl || "").filter(Boolean);
     if (img?.url) return [img.url];
     if (img?.contentUrl) return [img.contentUrl];
   } catch { /* */ }
@@ -104,18 +79,16 @@ function extractImagesFromJsonLd(jsonLd: Record<string, any>): string[] {
 
 function findProductImages(doc: any, html: string): string[] {
   const images: string[] = [];
-  
-  // Try data-src and src attributes from img tags
   const imgTags = doc?.querySelectorAll("img") || [];
   for (const img of imgTags) {
-    const src = (img as any).getAttribute("data-src") || 
+    const src = (img as any).getAttribute("data-src") ||
                 (img as any).getAttribute("data-zoom-image") ||
                 (img as any).getAttribute("data-large-image") ||
                 (img as any).getAttribute("src") || "";
     if (src && isValidImageUrl(src)) {
       const fullUrl = src.startsWith("//") ? `https:${src}` : src;
       if (fullUrl.startsWith("http") && (
-        fullUrl.includes(".jpg") || fullUrl.includes(".jpeg") || 
+        fullUrl.includes(".jpg") || fullUrl.includes(".jpeg") ||
         fullUrl.includes(".png") || fullUrl.includes(".webp") ||
         fullUrl.includes("images") || fullUrl.includes("img") ||
         fullUrl.includes("produto") || fullUrl.includes("product")
@@ -124,8 +97,6 @@ function findProductImages(doc: any, html: string): string[] {
       }
     }
   }
-
-  // Try to find images in data attributes or JSON embedded in page
   const imgPatterns = [
     /"original"\s*:\s*"(https?:\/\/[^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/gi,
     /"zoom(?:Image|Url)?"\s*:\s*"(https?:\/\/[^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/gi,
@@ -140,8 +111,161 @@ function findProductImages(doc: any, html: string): string[] {
       }
     }
   }
-
   return [...new Set(images)];
+}
+
+// ── Mercado Livre specific extraction ──
+function isMercadoLivre(url: string): boolean {
+  return /mercadoli[vb]re\.com|mlstatic\.com|mercadolibre\.com/i.test(url);
+}
+
+function extractMeliFromInitialState(html: string): { title?: string; price?: string; image?: string } {
+  const result: { title?: string; price?: string; image?: string } = {};
+
+  // Try __PRELOADED_STATE__ or window.__PRELOADED_STATE__
+  const statePatterns = [
+    /window\.__PRELOADED_STATE__\s*=\s*({[\s\S]*?});\s*(?:<\/script>|window\.)/,
+    /"initialState"\s*:\s*({[\s\S]*?})\s*[,;}\]]/,
+  ];
+
+  for (const pattern of statePatterns) {
+    const match = html.match(pattern);
+    if (match) {
+      try {
+        const state = JSON.parse(match[1]);
+        // Navigate common ML state structures
+        const comp = state?.initialState?.components;
+        if (comp) {
+          // Title from header
+          const header = comp?.header;
+          if (header?.title) result.title = header.title;
+          // Price
+          const price = comp?.price;
+          if (price?.price?.value) {
+            result.price = `R$ ${parseFloat(price.price.value).toFixed(2).replace(".", ",")}`;
+          }
+        }
+      } catch { /* */ }
+    }
+  }
+
+  // Extract title from specific ML patterns in HTML
+  if (!result.title) {
+    const titlePatterns = [
+      /"title"\s*:\s*"([^"]{10,200})"/,
+      /class="ui-pdp-title"[^>]*>([^<]+)/,
+      /data-testid="pdp-title"[^>]*>([^<]+)/,
+    ];
+    for (const p of titlePatterns) {
+      const m = html.match(p);
+      if (m && m[1] && !m[1].includes("{") && !m[1].includes("function")) {
+        result.title = m[1];
+        break;
+      }
+    }
+  }
+
+  // Extract price from ML-specific patterns
+  if (!result.price) {
+    const pricePatterns = [
+      /"price"\s*:\s*([\d.]+)/,
+      /"amount"\s*:\s*([\d.]+)/,
+      /class="andes-money-amount__fraction"[^>]*>([\d.]+)/,
+      /itemprop="price"\s+content="([\d.]+)"/,
+    ];
+    for (const p of pricePatterns) {
+      const m = html.match(p);
+      if (m && m[1]) {
+        const num = parseFloat(m[1]);
+        if (!isNaN(num) && num > 1) {
+          result.price = `R$ ${num.toFixed(2).replace(".", ",")}`;
+          break;
+        }
+      }
+    }
+  }
+
+  // Extract image from ML CDN patterns
+  if (!result.image) {
+    const imgPatterns = [
+      /"(https?:\/\/http2\.mlstatic\.com\/D_[^"]+)"/,
+      /"thumbnail"\s*:\s*"(https?:\/\/[^"]+mlstatic[^"]+)"/,
+      /"src"\s*:\s*"(https?:\/\/[^"]+mlstatic\.com[^"]+\.(?:jpg|jpeg|webp|png)[^"]*)"/,
+      /content="(https?:\/\/[^"]+mlstatic\.com[^"]+\.(?:jpg|jpeg|webp|png)[^"]*)"/,
+    ];
+    for (const p of imgPatterns) {
+      const m = html.match(p);
+      if (m && m[1]) {
+        result.image = m[1].replace(/-[OIFR]\.jpg/, "-O.jpg");
+        break;
+      }
+    }
+  }
+
+  return result;
+}
+
+// ── Mercado Livre API fallback ──
+async function fetchMeliApi(url: string): Promise<{ title?: string; price?: string; image?: string }> {
+  // Extract item ID from URL (e.g., MLB27391145 or MLB-27391145)
+  const idMatch = url.match(/ML[AB]\d+/i) || url.match(/ML[AB]-?\d+/i);
+  if (!idMatch) return {};
+
+  const itemId = idMatch[0].replace("-", "");
+  try {
+    const res = await fetch(`https://api.mercadolibre.com/items/${itemId}`, {
+      headers: { "Accept": "application/json" },
+    });
+    if (!res.ok) return {};
+    const data = await res.json();
+    const result: { title?: string; price?: string; image?: string } = {};
+    if (data.title) result.title = data.title;
+    if (data.price) result.price = `R$ ${parseFloat(data.price).toFixed(2).replace(".", ",")}`;
+    if (data.pictures?.[0]?.secure_url) {
+      result.image = data.pictures[0].secure_url;
+    } else if (data.thumbnail) {
+      result.image = data.thumbnail.replace(/-[OIFR]\.jpg/, "-O.jpg");
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
+
+async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string }> {
+  const userAgents = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+  ];
+
+  let html = "";
+  let finalUrl = url;
+
+  for (const ua of userAgents) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          "User-Agent": ua,
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+          "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+          "Accept-Encoding": "identity",
+          "Cache-Control": "no-cache",
+          "Sec-Fetch-Dest": "document",
+          "Sec-Fetch-Mode": "navigate",
+          "Sec-Fetch-Site": "none",
+          "Sec-Fetch-User": "?1",
+          "Upgrade-Insecure-Requests": "1",
+        },
+        redirect: "follow",
+      });
+      const text = await res.text();
+      finalUrl = res.url || url;
+      if (text.length > html.length) html = text;
+      if (html.length > 5000) break;
+    } catch { continue; }
+  }
+
+  return { html, finalUrl };
 }
 
 Deno.serve(async (req) => {
@@ -158,99 +282,93 @@ Deno.serve(async (req) => {
       });
     }
 
-    const userAgents = [
-      "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-    ];
+    // ── Mercado Livre: use public API first ──
+    if (isMercadoLivre(url)) {
+      console.log("Mercado Livre detected, trying API...");
+      const apiData = await fetchMeliApi(url);
 
-    let html = "";
-    let finalUrl = url;
-
-    for (const ua of userAgents) {
-      try {
-        const res = await fetch(url, {
-          headers: {
-            "User-Agent": ua,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-            "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-            "Accept-Encoding": "identity",
-            "Cache-Control": "no-cache",
-          },
-          redirect: "follow",
-        });
-        const text = await res.text();
-        finalUrl = res.url || url;
-        // Keep the longest response (more content = better)
-        if (text.length > html.length) {
-          html = text;
-        }
-        if (html.length > 5000) break;
-      } catch {
-        continue;
+      if (apiData.title && apiData.price) {
+        console.log("ML API success:", { title: apiData.title?.substring(0, 60), price: apiData.price, hasImage: !!apiData.image });
+        return new Response(
+          JSON.stringify({
+            title: decodeHtmlEntities(apiData.title),
+            image: apiData.image || "",
+            description: "",
+            price: apiData.price,
+            url,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
+
+      // Fallback: scrape HTML + extract from ML-specific patterns
+      console.log("ML API incomplete, trying HTML scrape...");
+      const { html, finalUrl } = await fetchHtml(url);
+      const meliData = extractMeliFromInitialState(html);
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const jsonLd = extractJsonLd(html);
+
+      const getMeta = (name: string) =>
+        doc?.querySelector(`meta[property='${name}']`)?.getAttribute("content") ||
+        doc?.querySelector(`meta[name='${name}']`)?.getAttribute("content") || "";
+
+      const title = decodeHtmlEntities(
+        meliData.title || apiData.title || jsonLd?.name || getMeta("og:title") ||
+        doc?.querySelector("h1")?.textContent?.trim() || "Produto"
+      ).replace(/\s*\|.*$/, "").replace(/\s*-\s*(Mercado|MercadoL).*$/i, "").trim() || "Produto";
+
+      const price = meliData.price || apiData.price || (jsonLd ? extractPriceFromJsonLd(jsonLd) : "") ||
+        (html.match(/R\$\s*[\d]+[.,][\d]{2}/)?.[0] || "");
+
+      const image = meliData.image || apiData.image ||
+        (jsonLd ? extractImagesFromJsonLd(jsonLd).filter(isValidImageUrl)[0] : "") ||
+        (getMeta("og:image") && isValidImageUrl(getMeta("og:image")) ? getMeta("og:image") : "") || "";
+
+      console.log("ML final:", { title: title.substring(0, 60), price, hasImage: !!image });
+      return new Response(
+        JSON.stringify({ title, image, description: getMeta("og:description") || "", price, url: finalUrl }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
+    // ── Generic scraping for other sites ──
+    const { html, finalUrl } = await fetchHtml(url);
     const doc = new DOMParser().parseFromString(html, "text/html");
     const jsonLd = extractJsonLd(html);
 
     const getMeta = (name: string) =>
       doc?.querySelector(`meta[property='${name}']`)?.getAttribute("content") ||
-      doc?.querySelector(`meta[name='${name}']`)?.getAttribute("content") ||
-      "";
+      doc?.querySelector(`meta[name='${name}']`)?.getAttribute("content") || "";
 
-    // Title
-    let title =
-      jsonLd?.name ||
-      getMeta("og:title") ||
-      getMeta("twitter:title") ||
-      doc?.querySelector("title")?.textContent?.trim() ||
-      doc?.querySelector("h1")?.textContent?.trim() ||
-      "";
-    // Clean up title
+    let title = jsonLd?.name || getMeta("og:title") || getMeta("twitter:title") ||
+      doc?.querySelector("title")?.textContent?.trim() || doc?.querySelector("h1")?.textContent?.trim() || "";
     title = decodeHtmlEntities(title);
     title = title.replace(/\s*\|.*$/, "").replace(/\s*-\s*(Amazon|Shopee|Mercado|Magazine).*$/i, "").trim() || "Produto";
 
-    // Image - prioritize JSON-LD, then meta, then page scanning
     let image = "";
     const jsonLdImages = jsonLd ? extractImagesFromJsonLd(jsonLd) : [];
-    const validJsonLdImages = jsonLdImages.filter(isValidImageUrl);
-    
     const ogImage = getMeta("og:image");
     const twitterImage = getMeta("twitter:image");
-    
     const candidates = [
-      ...validJsonLdImages,
+      ...jsonLdImages.filter(isValidImageUrl),
       ...(ogImage && isValidImageUrl(ogImage) ? [ogImage] : []),
       ...(twitterImage && isValidImageUrl(twitterImage) ? [twitterImage] : []),
       ...findProductImages(doc, html),
     ];
-    
     image = candidates[0] || "";
 
-    // Description
-    const description =
-      jsonLd?.description ||
-      getMeta("og:description") ||
-      getMeta("description") ||
-      "";
+    const description = jsonLd?.description || getMeta("og:description") || getMeta("description") || "";
 
-    // Price
     let price = jsonLd ? extractPriceFromJsonLd(jsonLd) : "";
     if (!price) {
-      const pricePatterns = [
-        /R\$\s*[\d]+[.,][\d]{2}/,
-        /R\$\s*[\d.,]+/,
-      ];
+      const pricePatterns = [/R\$\s*[\d]+[.,][\d]{2}/, /R\$\s*[\d.,]+/];
       for (const pattern of pricePatterns) {
         const match = html.match(pattern);
-        if (match) {
-          price = match[0].trim();
-          break;
-        }
+        if (match) { price = match[0].trim(); break; }
       }
     }
 
-    console.log("Scraped:", { title: title.substring(0, 60), hasImage: !!image, price, hasJsonLd: !!jsonLd, candidates: candidates.length });
+    console.log("Scraped:", { title: title.substring(0, 60), hasImage: !!image, price, hasJsonLd: !!jsonLd });
 
     return new Response(
       JSON.stringify({ title, image, description, price, url: finalUrl }),
