@@ -207,7 +207,7 @@ const CreateArt = () => {
                     </Card>
                   )}
 
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
                     {templates.filter(t => t.format.includes(format)).map((t) => (
                       <div
                         key={t.id}
