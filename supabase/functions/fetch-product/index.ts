@@ -205,9 +205,28 @@ function extractMeliFromInitialState(html: string): { title?: string; price?: st
   return result;
 }
 
+// ── Extract product name from URL slug ──
+function extractTitleFromUrl(url: string): string {
+  try {
+    const pathname = new URL(url).pathname;
+    // ML URLs: /product-name-here/p/MLB123 or /product-name-here_MLB123
+    const segments = pathname.split("/").filter(Boolean);
+    // Find the segment before "/p/" or the first long segment
+    const pIndex = segments.indexOf("p");
+    const slugSegment = pIndex > 0 ? segments[pIndex - 1] : segments[0] || "";
+    if (slugSegment && slugSegment.length > 3) {
+      return slugSegment
+        .replace(/-/g, " ")
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase())
+        .trim();
+    }
+  } catch { /* */ }
+  return "";
+}
+
 // ── Mercado Livre API ──
 async function fetchMeliApi(url: string): Promise<{ title?: string; price?: string; image?: string }> {
-  // Extract item ID from URL — supports MLB27391145, MLB-27391145, /p/MLB27391145
   const idMatch = url.match(/ML[AB]-?\d+/i);
   if (!idMatch) {
     console.log("ML API: no item ID found in URL");
@@ -221,13 +240,8 @@ async function fetchMeliApi(url: string): Promise<{ title?: string; price?: stri
       headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" },
     });
     console.log("ML API response status:", res.status);
-    if (!res.ok) {
-      const errText = await res.text();
-      console.log("ML API error:", errText.substring(0, 200));
-      return {};
-    }
+    if (!res.ok) return {};
     const data = await res.json();
-    console.log("ML API data:", { title: data.title?.substring(0, 50), price: data.price, hasPictures: !!data.pictures?.length });
     const result: { title?: string; price?: string; image?: string } = {};
     if (data.title) result.title = data.title;
     if (data.price) result.price = `R$ ${parseFloat(data.price).toFixed(2).replace(".", ",")}`;
