@@ -331,8 +331,10 @@ function extractMeliFromHtml(html: string): { title?: string; price?: string; im
   // Title patterns
   const titlePatterns = [
     /class="ui-pdp-title"[^>]*>([^<]+)/,
+    /class="ui-pdp-title"[^>]*>([^<]+)/,
     /data-testid="pdp-title"[^>]*>([^<]+)/,
     /"title"\s*:\s*"([^"]{10,200})"/,
+    /"product_title"\s*:\s*"([^"]{10,200})"/,
   ];
   for (const p of titlePatterns) {
     const m = html.match(p);
@@ -342,33 +344,47 @@ function extractMeliFromHtml(html: string): { title?: string; price?: string; im
     }
   }
 
-  // Price patterns
+  // Price patterns - more aggressive
   const pricePatterns = [
     /itemprop="price"\s+content="([\d.]+)"/,
+    /property="product:price:amount"\s+content="([\d.]+)"/,
     /class="andes-money-amount__fraction"[^>]*>([\d.]+)/,
-    /"price"\s*:\s*([\d.]+)/,
-    /"amount"\s*:\s*([\d.]+)/,
+    /"price"\s*:\s*([\d]+(?:\.\d+)?)\s*[,}]/,
+    /"amount"\s*:\s*([\d]+(?:\.\d+)?)\s*[,}]/,
+    /"sale_price"\s*:\s*([\d]+(?:\.\d+)?)/,
+    /R\$\s*([\d]{1,3}(?:\.?\d{3})*(?:,\d{2})?)/,
   ];
   for (const p of pricePatterns) {
     const m = html.match(p);
     if (m && m[1]) {
-      const num = parseFloat(m[1]);
-      if (!isNaN(num) && num > 1) {
+      let raw = m[1];
+      let num: number;
+      if (raw.includes(",") && raw.includes(".")) {
+        num = parseFloat(raw.replace(/\./g, "").replace(",", "."));
+      } else if (raw.includes(",")) {
+        num = parseFloat(raw.replace(",", "."));
+      } else {
+        num = parseFloat(raw);
+      }
+      if (!isNaN(num) && num > 1 && num < 1_000_000) {
         result.price = `R$ ${num.toFixed(2).replace(".", ",")}`;
         break;
       }
     }
   }
 
-  // Image from ML CDN
+  // Image from ML CDN - look for product images specifically
   const imgPatterns = [
-    /"(https?:\/\/http2\.mlstatic\.com\/D_[^"]+)"/,
+    // D_ prefix is the product image pattern on mlstatic
+    /"(https?:\/\/http2\.mlstatic\.com\/D_[^"]+\.(?:jpg|jpeg|webp|png)[^"]*)"/,
+    /"(https?:\/\/[^"]*mlstatic\.com\/D_[^"]+)"/,
+    // og:image from meta tags (most reliable for ML)
+    /property="og:image"\s+content="(https?:\/\/[^"]+)"/,
     /content="(https?:\/\/[^"]+mlstatic\.com[^"]+\.(?:jpg|jpeg|webp|png)[^"]*)"/,
-    /"src"\s*:\s*"(https?:\/\/[^"]+mlstatic[^"]+\.(?:jpg|jpeg|webp|png)[^"]*)"/,
   ];
   for (const p of imgPatterns) {
     const m = html.match(p);
-    if (m && m[1]) {
+    if (m && m[1] && isValidImageUrl(m[1])) {
       result.image = m[1].replace(/-[A-Z]\.jpg/, "-O.jpg");
       break;
     }
