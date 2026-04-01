@@ -383,7 +383,7 @@ const CreateArt = () => {
               {/* Centro – 50% imagem */}
               <div className="absolute left-[5%] right-[5%] top-[20%] h-[50%] bg-white rounded-xl flex items-center justify-center p-4 shadow-lg">
                 {displayImage ? (
-                  <img src={displayImage} alt={titulo} className="max-h-full max-w-full object-contain rounded-lg drop-shadow-2xl" />
+                  <img src={displayImage} alt={titulo} crossOrigin="anonymous" className="max-h-full max-w-full object-contain rounded-lg drop-shadow-2xl" />
                 ) : (
                   <div className="w-full h-full bg-muted rounded-lg flex items-center justify-center text-muted-foreground text-sm">
                     Imagem do Produto
