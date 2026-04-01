@@ -207,6 +207,7 @@ Deno.serve(async (req) => {
       doc?.querySelector("h1")?.textContent?.trim() ||
       "";
     // Clean up title
+    title = decodeHtmlEntities(title);
     title = title.replace(/\s*\|.*$/, "").replace(/\s*-\s*(Amazon|Shopee|Mercado|Magazine).*$/i, "").trim() || "Produto";
 
     // Image - prioritize JSON-LD, then meta, then page scanning
