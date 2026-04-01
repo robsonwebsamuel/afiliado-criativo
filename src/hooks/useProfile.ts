@@ -34,8 +34,9 @@ export function useProfile() {
 
     fetchProfile();
 
+    const channelName = `profile-changes-${user.id}-${Date.now()}`;
     const channel = supabase
-      .channel('profile-changes')
+      .channel(channelName)
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
