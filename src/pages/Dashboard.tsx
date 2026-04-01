@@ -1,16 +1,30 @@
 import { AppLayout } from "@/components/AppLayout";
-import { currentUser, planLimits, artHistory, planDetails } from "@/lib/mock-data";
+import { planLimits, planDetails, artHistory } from "@/lib/mock-data";
 import { Sparkles, Image, LayoutGrid, History, ArrowRight, Crown, TrendingUp, MousePointerClick } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { useProfile } from "@/hooks/useProfile";
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const limit = planLimits[currentUser.plan];
-  const progress = limit.daily === Infinity ? 10 : (currentUser.artsCreatedToday / limit.daily) * 100;
+  const { user } = useAuth();
+  const { profile, loading } = useProfile();
+
+  const plan = (profile?.plan || 'free') as keyof typeof planLimits;
+  const displayName = profile?.display_name || user?.email || 'Usuário';
+  const limit = planLimits[plan];
   const recentArts = artHistory.slice(0, 5);
-  const plan = planDetails.find(p => p.type === currentUser.plan);
-  const artesDisponiveis = limit.daily === Infinity ? '∞' : limit.daily - currentUser.artsCreatedToday;
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -18,30 +32,27 @@ const Dashboard = () => {
         {/* Header */}
         <div className="space-y-1">
           <h1 className="text-2xl font-display font-bold text-foreground">
-            Olá, {currentUser.name.split(' ')[0]}! 👋
+            Olá, {displayName.split(' ')[0]}! 👋
           </h1>
           <p className="text-muted-foreground text-sm">
             Seu Post Pronto em Segundos
           </p>
         </div>
 
-        {/* Stats Row — Quadros 2, 3, 4 */}
+        {/* Stats Row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Quadro 2 - Total de artes criadas */}
           <StatCard
             icon={<Image className="w-5 h-5 text-primary" />}
             label="Total de Artes Criadas"
-            value={String(currentUser.totalArtsCreated)}
+            value="—"
           />
-          {/* Quadro 3 - Artes disponíveis hoje */}
           <StatCard
             icon={<Sparkles className="w-5 h-5 text-primary" />}
             label="Artes Disponíveis Hoje"
-            value={`${currentUser.artsCreatedToday} / ${limit.daily === Infinity ? '∞' : limit.daily}`}
-            sub={limit.daily === Infinity ? 'Ilimitadas' : `${artesDisponiveis} restantes`}
-            progress={progress}
+            value={limit.daily === Infinity ? '∞' : String(limit.daily)}
+            sub={limit.daily === Infinity ? 'Ilimitadas' : `por dia no plano ${plan}`}
           />
-          {/* Quadro 4 - Plano atual */}
+          {/* Plano atual */}
           <div className="rounded-xl bg-surface border border-border/50 p-5 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground uppercase tracking-widest">Plano Atual</span>
@@ -49,11 +60,11 @@ const Dashboard = () => {
             </div>
             <div className="flex items-end gap-2">
               <span className="text-2xl font-display font-bold text-foreground tabular-nums capitalize">
-                {currentUser.plan}
+                {plan}
               </span>
-              {currentUser.plan === 'pro' && <Crown className="w-4 h-4 text-accent mb-1" />}
+              {plan === 'pro' && <Crown className="w-4 h-4 text-accent mb-1" />}
             </div>
-            {currentUser.plan !== 'pro' && (
+            {plan !== 'pro' && (
               <Button
                 size="sm"
                 variant="outline"
@@ -67,7 +78,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Quadro 5 — CTA Criar Arte */}
+        {/* CTA Criar Arte */}
         <div className="rounded-xl bg-surface border border-border/50 p-8 flex flex-col items-center gap-4 text-center">
           <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center">
             <Sparkles className="w-7 h-7 text-primary" />
@@ -82,9 +93,8 @@ const Dashboard = () => {
           </Button>
         </div>
 
-        {/* Quadro 1 — Últimos 5 produtos + atalhos */}
+        {/* Últimos produtos + atalhos */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Quadro 1: Últimos 5 produtos */}
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-widest">
               Últimos 5 Produtos Divulgados
@@ -111,7 +121,6 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Atalhos rápidos */}
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-widest">Atalhos</h3>
             <div className="space-y-2">
