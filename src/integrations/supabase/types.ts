@@ -44,6 +44,33 @@ export type Database = {
         }
         Relationships: []
       }
+      short_links: {
+        Row: {
+          clicks: number | null
+          created_at: string | null
+          id: string
+          original_url: string
+          slug: string
+          user_id: string
+        }
+        Insert: {
+          clicks?: number | null
+          created_at?: string | null
+          id?: string
+          original_url: string
+          slug: string
+          user_id: string
+        }
+        Update: {
+          clicks?: number | null
+          created_at?: string | null
+          id?: string
+          original_url?: string
+          slug?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
