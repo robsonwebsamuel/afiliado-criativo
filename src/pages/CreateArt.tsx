@@ -359,8 +359,8 @@ const CreateArt = () => {
               </div>
               {/* Product area */}
               <div className="absolute left-[5%] right-[5%] top-[10%] bg-white rounded-xl flex flex-col items-center justify-center p-4 gap-3 shadow-lg" style={{ height: '80%' }}>
-                {product?.image ? (
-                  <img src={product.image} alt={titulo} className="w-full flex-1 object-cover rounded-lg" />
+                {displayImage ? (
+                  <img src={displayImage} alt={titulo} className="w-full flex-1 object-cover rounded-lg" />
                 ) : (
                   <div className="w-full flex-1 bg-muted rounded-lg flex items-center justify-center text-muted-foreground text-sm">
                     Imagem do Produto
