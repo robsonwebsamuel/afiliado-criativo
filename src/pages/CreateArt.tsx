@@ -108,6 +108,7 @@ const CreateArt = () => {
     setCaption('');
     setTitulo('');
     setValor('');
+    setManualImageUrl('');
     setCopied(false);
   }
 
