@@ -386,11 +386,11 @@ const CreateArt = () => {
               </div>
               {/* Rodapé – 30% */}
               <div className="absolute left-[5%] right-[5%] bottom-0 h-[30%] flex flex-col items-center justify-center gap-3 z-10">
-                <h3 className="text-base font-display font-black text-white text-center leading-tight line-clamp-3 drop-shadow-lg px-2">
+                <h3 className="text-base font-montserrat font-normal text-white text-center leading-tight line-clamp-3 drop-shadow-lg px-2">
                   {titulo || 'Nome do Produto'}
                 </h3>
                 <div className="bg-white rounded-full px-6 py-2 shadow-lg">
-                  <span className="text-2xl font-black font-mono text-gray-900">{valor || 'R$ --,--'}</span>
+                  <span className="text-2xl font-montserrat font-bold text-gray-900">R$ {formatPrice(valor) || '--,--'}</span>
                 </div>
                 <div className="px-5 py-1.5 border-2 border-white/50 rounded-full">
                   <span className="text-[10px] font-bold text-white uppercase">{cta}</span>
