@@ -192,8 +192,8 @@ const CreateArt = () => {
                   {product && (
                     <Card className="border-primary/20 bg-primary/5">
                       <CardContent className="p-4 flex gap-4 items-center">
-                        {product.image && (
-                          <img src={product.image} alt={product.title} className="w-16 h-16 rounded-lg object-cover" />
+                        {displayImage && (
+                          <img src={displayImage} alt={product.title} className="w-16 h-16 rounded-lg object-cover" />
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-foreground truncate">{product.title}</p>
