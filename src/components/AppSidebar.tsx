@@ -13,10 +13,11 @@ import {
   LogOut,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useLocation, useNavigate } from "react-router-dom";
-import { currentUser, planLimits } from "@/lib/mock-data";
+import { useNavigate } from "react-router-dom";
+import { planLimits } from "@/lib/mock-data";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/contexts/AuthContext";
+import { useProfile } from "@/hooks/useProfile";
 
 import {
   Sidebar,
@@ -52,21 +53,18 @@ const accountItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const location = useLocation();
   const navigate = useNavigate();
-  const { signOut, isAdmin } = useAuth();
-  const isActive = (path: string) => location.pathname === path;
+  const { user, signOut, isAdmin } = useAuth();
+  const { profile } = useProfile();
 
   const handleLogout = async () => {
     await signOut();
     navigate('/login');
   };
 
-  const limit = planLimits[currentUser.plan];
-  const progress = limit.daily === Infinity
-    ? 10
-    : Math.min((currentUser.artsCreatedToday / limit.daily) * 100, 100);
-  const planLabel = currentUser.plan.charAt(0).toUpperCase() + currentUser.plan.slice(1);
+  const plan = (profile?.plan || 'free') as keyof typeof planLimits;
+  const displayName = profile?.display_name || user?.email || 'Usuário';
+  const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1);
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border/50">
@@ -110,7 +108,7 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {/* Pro section */}
-        {currentUser.plan === "pro" && (
+        {plan === "pro" && (
           <SidebarGroup>
             <SidebarGroupLabel className="text-muted-foreground uppercase tracking-widest text-xs">
               Pro
@@ -188,34 +186,17 @@ export function AppSidebar() {
       <SidebarFooter className="border-t border-border/50 p-4">
         {!collapsed && (
           <div className="space-y-3">
-            {/* Theme toggle */}
             <ThemeToggle collapsed={collapsed} />
-
-            {/* Usage bar */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Artes hoje</span>
-                <span className="text-foreground font-medium tabular-nums">
-                  {currentUser.artsCreatedToday}/{limit.daily === Infinity ? '∞' : limit.daily}
-                </span>
-              </div>
-              <div className="h-1.5 bg-elevated rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary rounded-full transition-all duration-500"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-            </div>
 
             {/* User */}
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-elevated flex items-center justify-center text-sm font-display font-bold text-foreground">
-                {currentUser.name.charAt(0)}
+                {displayName.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">{currentUser.name}</p>
+                <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
                 <div className="flex items-center gap-1.5">
-                  {currentUser.plan === 'pro' && <Crown className="w-3 h-3 text-accent" />}
+                  {plan === 'pro' && <Crown className="w-3 h-3 text-accent" />}
                   <span className="text-xs text-muted-foreground capitalize">{planLabel}</span>
                 </div>
               </div>
