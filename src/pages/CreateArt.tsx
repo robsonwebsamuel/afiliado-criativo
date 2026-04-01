@@ -207,27 +207,36 @@ const CreateArt = () => {
                     </Card>
                   )}
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                     {templates.filter(t => t.format.includes(format)).map((t) => (
                       <div
                         key={t.id}
                         onClick={() => setSelectedTemplateId(t.id)}
-                        className={`aspect-square rounded-xl border-2 transition-all cursor-pointer overflow-hidden relative group ${
+                        className={`rounded-xl border-2 transition-all cursor-pointer overflow-hidden relative group ${
                           selectedTemplateId === t.id ? 'border-primary' : 'border-transparent hover:border-border'
                         }`}
+                        style={{ aspectRatio: '9/16' }}
                       >
                         <div className={`absolute inset-0 bg-gradient-to-br ${t.preview}`} />
-                        <div className="absolute inset-[6%] top-[10%] bottom-[10%] bg-white rounded-lg flex flex-col items-center justify-center p-2 gap-1" style={{ height: '80%' }}>
-                          {displayImage ? (
-                            <img src={displayImage} alt="" className="w-full flex-1 object-cover rounded" />
-                          ) : (
-                            <div className="w-full flex-1 bg-muted rounded" />
-                          )}
-                          <p className="text-[7px] font-bold text-gray-800 text-center leading-tight truncate w-full">{titulo}</p>
-                          <span className="text-[8px] font-black text-gray-900">{valor}</span>
+                        {/* Top badge */}
+                        <div className="absolute top-2 left-2 z-10">
+                          <span className="text-[6px] uppercase tracking-widest font-bold text-white/80 bg-black/20 px-1.5 py-0.5 rounded">Oferta</span>
                         </div>
-                        <div className="absolute bottom-1.5 left-2 right-2 z-10">
-                          <span className="text-[10px] font-bold text-white bg-black/40 px-1.5 py-0.5 rounded leading-none">{t.name}</span>
+                        {/* Center: product image */}
+                        <div className="absolute left-[6%] right-[6%] top-[18%] bottom-[30%] bg-white rounded-lg flex items-center justify-center p-1.5 overflow-hidden">
+                          {displayImage ? (
+                            <img src={displayImage} alt="" className="w-full h-full object-contain rounded" />
+                          ) : (
+                            <div className="w-full h-full bg-muted rounded" />
+                          )}
+                        </div>
+                        {/* Bottom: title + price */}
+                        <div className="absolute left-[6%] right-[6%] bottom-[6%] flex flex-col items-center gap-0.5 z-10">
+                          <p className="text-[6px] font-bold text-white text-center leading-tight line-clamp-2 w-full drop-shadow">{titulo}</p>
+                          <span className="text-[8px] font-black text-white bg-black/30 px-1.5 py-0.5 rounded drop-shadow">{valor}</span>
+                        </div>
+                        <div className="absolute bottom-0.5 left-1 z-10">
+                          <span className="text-[7px] font-bold text-white/60">{t.name}</span>
                         </div>
                         {selectedTemplateId === t.id && (
                           <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center z-10">
@@ -352,28 +361,36 @@ const CreateArt = () => {
           <div className="space-y-4">
             <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Pré-visualização</h3>
 
-            <div className={`rounded-2xl border border-border/50 overflow-hidden shadow-2xl relative ${format === 'stories' ? 'aspect-[9/16]' : 'aspect-square'}`}>
+            <div
+              id="template-preview"
+              style={{ aspectRatio: '9/16' }}
+              className="w-[400px] rounded-2xl border border-border/50 overflow-hidden shadow-2xl relative"
+            >
               <div className={`absolute inset-0 bg-gradient-to-br ${selectedTemplate?.preview || 'from-primary to-accent'}`} />
-              {/* Top bar */}
-              <div className="absolute top-0 left-0 right-0 h-[10%] flex items-center justify-between px-4 z-10">
-                <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/80">Oferta Especial</span>
+              {/* Topo – 20% */}
+              <div className="absolute top-0 left-0 right-0 h-[20%] flex items-center justify-center z-10">
+                <span className="bg-white/20 text-white text-sm font-bold px-4 py-1 rounded-full tracking-widest uppercase">
+                  Oferta Especial
+                </span>
               </div>
-              {/* Product area */}
-              <div className="absolute left-[5%] right-[5%] top-[10%] bg-white rounded-xl flex flex-col items-center justify-center p-4 gap-3 shadow-lg" style={{ height: '80%' }}>
+              {/* Centro – 50% imagem */}
+              <div className="absolute left-[5%] right-[5%] top-[20%] h-[50%] bg-white rounded-xl flex items-center justify-center p-4 shadow-lg">
                 {displayImage ? (
-                  <img src={displayImage} alt={titulo} className="w-full flex-1 object-cover rounded-lg" />
+                  <img src={displayImage} alt={titulo} className="max-h-full max-w-full object-contain rounded-lg drop-shadow-2xl" />
                 ) : (
-                  <div className="w-full flex-1 bg-muted rounded-lg flex items-center justify-center text-muted-foreground text-sm">
+                  <div className="w-full h-full bg-muted rounded-lg flex items-center justify-center text-muted-foreground text-sm">
                     Imagem do Produto
                   </div>
                 )}
-                <h3 className="text-sm font-display font-black text-gray-900 text-center leading-tight">{titulo || 'Nome do Produto'}</h3>
-                <div className="bg-gray-100 px-4 py-1.5 rounded-lg">
-                  <span className="text-xl font-black font-mono text-gray-900">{valor || 'R$ --,--'}</span>
-                </div>
               </div>
-              {/* CTA bar */}
-              <div className="absolute bottom-0 left-0 right-0 h-[10%] flex items-center justify-center z-10">
+              {/* Rodapé – 30% */}
+              <div className="absolute left-[5%] right-[5%] bottom-0 h-[30%] flex flex-col items-center justify-center gap-3 z-10">
+                <h3 className="text-base font-display font-black text-white text-center leading-tight line-clamp-3 drop-shadow-lg px-2">
+                  {titulo || 'Nome do Produto'}
+                </h3>
+                <div className="bg-white rounded-full px-6 py-2 shadow-lg">
+                  <span className="text-2xl font-black font-mono text-gray-900">{valor || 'R$ --,--'}</span>
+                </div>
                 <div className="px-5 py-1.5 border-2 border-white/50 rounded-full">
                   <span className="text-[10px] font-bold text-white uppercase">{cta}</span>
                 </div>
