@@ -369,7 +369,6 @@ const CreateArt = () => {
             <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Pré-visualização</h3>
 
             <div
-              ref={previewRef}
               id="template-preview"
               style={{ aspectRatio: '9/16' }}
               className="w-full rounded-2xl border border-border/50 overflow-hidden shadow-2xl relative"
