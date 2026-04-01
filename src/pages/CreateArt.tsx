@@ -374,8 +374,8 @@ const CreateArt = () => {
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
-                    <Button size="lg" className="w-full" onClick={() => toast.success("Arte baixada!")}>
-                      <Download className="w-4 h-4 mr-2" /> Download
+                    <Button size="lg" className="w-full" onClick={handleDownload}>
+                      <Download className="w-4 h-4 mr-2" /> Download PNG
                     </Button>
                     <Button size="lg" variant="outline" className="w-full" onClick={copyCaption}>
                       <Copy className="w-4 h-4 mr-2" /> Legenda
