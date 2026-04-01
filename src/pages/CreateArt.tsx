@@ -146,10 +146,10 @@ const CreateArt = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-8">
           {/* Main Panel */}
-          <div className="space-y-6">
-            <div className="rounded-xl bg-surface border border-border/50 p-6 min-h-[400px] flex flex-col">
+          <div className="space-y-6 min-w-0">
+            <div className="rounded-xl bg-surface border border-border/50 p-6 min-h-[400px] flex flex-col overflow-hidden">
 
               {/* Step: Link */}
               {currentStep === 'link' && (
@@ -207,7 +207,7 @@ const CreateArt = () => {
                     </Card>
                   )}
 
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
                     {templates.filter(t => t.format.includes(format)).map((t) => (
                       <div
                         key={t.id}
@@ -364,7 +364,7 @@ const CreateArt = () => {
             <div
               id="template-preview"
               style={{ aspectRatio: '9/16' }}
-              className="w-[400px] rounded-2xl border border-border/50 overflow-hidden shadow-2xl relative"
+              className="w-full rounded-2xl border border-border/50 overflow-hidden shadow-2xl relative"
             >
               <div className={`absolute inset-0 bg-gradient-to-br ${selectedTemplate?.preview || 'from-primary to-accent'}`} />
               {/* Topo – 20% */}
