@@ -248,6 +248,10 @@ const CreateArt = () => {
                       <Input value={valor} onChange={e => setValor(e.target.value)} />
                     </div>
                   </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground uppercase">URL da Imagem (opcional, caso não carregue)</label>
+                    <Input value={manualImageUrl} onChange={e => setManualImageUrl(e.target.value)} placeholder="https://..." />
+                  </div>
 
                   <div className="pt-4 flex justify-between">
                     <Button variant="ghost" onClick={handleBack}><ArrowLeft className="w-4 h-4 mr-2" /> Voltar</Button>
