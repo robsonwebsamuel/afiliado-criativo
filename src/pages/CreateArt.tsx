@@ -339,16 +339,20 @@ const CreateArt = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
-                    <Button size="lg" className="w-full" onClick={handleDownload}>
-                      <Download className="w-4 h-4 mr-2" /> Download PNG
-                    </Button>
-                    <Button size="lg" variant="outline" className="w-full" onClick={copyCaption}>
-                      <Copy className="w-4 h-4 mr-2" /> Legenda
-                    </Button>
-                    <Button size="lg" variant="outline" className="w-full col-span-2" onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(caption)}`, '_blank')}>
-                      <ExternalLink className="w-4 h-4 mr-2" /> WhatsApp
-                    </Button>
+                  <div className="flex flex-col gap-4 w-full max-w-sm">
+                    <DownloadArtButton
+                      productName={titulo}
+                      price={valor}
+                      elementId="template-preview"
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <Button size="lg" variant="outline" className="w-full" onClick={copyCaption}>
+                        <Copy className="w-4 h-4 mr-2" /> Legenda
+                      </Button>
+                      <Button size="lg" variant="outline" className="w-full" onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(caption)}`, '_blank')}>
+                        <ExternalLink className="w-4 h-4 mr-2" /> WhatsApp
+                      </Button>
+                    </div>
                   </div>
 
                   <Button variant="ghost" size="sm" onClick={handleReset}>
