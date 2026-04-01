@@ -1,86 +1,113 @@
 import { AppLayout } from "@/components/AppLayout";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { mockExtractedProduct, templates, captionVariants, currentUser, planLimits } from "@/lib/mock-data";
-import { Link2, Sparkles, Copy, RefreshCw, Download, Check, Loader2, Pencil, ArrowLeft, ArrowRight, Scissors, ExternalLink } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Link2, Sparkles, Copy, RefreshCw, Download, Check, Loader2, ArrowLeft, ArrowRight, ExternalLink } from "lucide-react";
+import { useProductScraper } from "@/hooks/useProductScraper";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { templates } from "@/lib/mock-data";
 
-type ToneType = 'seria' | 'profissional' | 'descontrada' | 'engracada';
-type Step = 'link' | 'template' | 'caption' | 'shorten' | 'download';
+type Step = 'link' | 'template' | 'caption' | 'download';
+
+const CAPTION_STYLES = [
+  { value: "vendas", label: "🔥 Foco em vendas" },
+  { value: "curiosidade", label: "🤔 Desperta curiosidade" },
+  { value: "urgencia", label: "⚡ Urgência / escassez" },
+  { value: "beneficios", label: "✅ Lista de benefícios" },
+  { value: "storytelling", label: "📖 Storytelling" },
+];
 
 const CreateArt = () => {
-  const { toast } = useToast();
-  const [currentStep, setCurrentStep] = useState<Step>('link');
+  const { product, loading: scraping, fetchProduct } = useProductScraper();
   const [link, setLink] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [currentStep, setCurrentStep] = useState<Step>('link');
   const [format, setFormat] = useState<'feed' | 'stories'>('feed');
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(templates[0].id);
-  const [tone, setTone] = useState<ToneType>('profissional');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(templates[0]?.id || null);
+  const [captionStyle, setCaptionStyle] = useState("vendas");
   const [caption, setCaption] = useState('');
-  const [editingCaption, setEditingCaption] = useState(false);
+  const [generatingCaption, setGeneratingCaption] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [generating, setGenerating] = useState(false);
 
-  // Sub-steps form data
-  const [titulo, setTitulo] = useState(mockExtractedProduct.title);
-  const [descricao, setDescricao] = useState(mockExtractedProduct.description);
-  const [valor, setValor] = useState(mockExtractedProduct.price);
+  // Editable fields populated from scraping
+  const [titulo, setTitulo] = useState('');
+  const [valor, setValor] = useState('');
   const [cta, setCta] = useState('Acesse agora e aproveite!');
-  const [rodape, setRodape] = useState('Link na bio • Compartilhe!');
-  const [shortLink, setShortLink] = useState('');
 
-  const limit = planLimits[currentUser.plan];
-  const stepOrder: Step[] = ['link', 'template', 'caption', 'shorten', 'download'];
+  const stepOrder: Step[] = ['link', 'template', 'caption', 'download'];
   const stepIndex = stepOrder.indexOf(currentStep);
-
-  const handleNext = () => {
-    if (currentStep === 'link' && !link.trim()) {
-      toast({ title: "Link inválido", description: "Cole um link do produto.", variant: "destructive" });
-      return;
-    }
-    if (currentStep === 'link') {
-      setLoading(true);
-      setTimeout(() => {
-        setLoading(false);
-        setCurrentStep('template');
-      }, 1000);
-      return;
-    }
-    if (currentStep === 'template' && !selectedTemplateId) {
-      toast({ title: "Escolha um template", variant: "destructive" });
-      return;
-    }
-    if (currentStep === 'template') {
-      setCaption(captionVariants[tone]);
-      setCurrentStep('caption');
-      return;
-    }
-    if (currentStep === 'caption') {
-      setCurrentStep('shorten');
-      return;
-    }
-    if (currentStep === 'shorten') {
-      setCurrentStep('download');
-      return;
-    }
-  };
-
-  const handleBack = () => {
-    if (stepIndex > 0) {
-      setCurrentStep(stepOrder[stepIndex - 1]);
-    }
-  };
 
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId) || templates[0];
 
-  const handleShorten = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setShortLink('https://bit.ly/afil-3xJkL');
-      setLoading(false);
-      toast({ title: "Link encurtado!" });
-    }, 1200);
-  };
+  async function handleFetchProduct() {
+    if (!link.trim()) {
+      toast.error("Cole o link do produto primeiro.");
+      return;
+    }
+    const data = await fetchProduct(link.trim());
+    if (data) {
+      setTitulo(data.title);
+      setValor(data.price);
+      setCurrentStep('template');
+    }
+  }
+
+  async function handleGenerateCaption() {
+    if (!product) return;
+    setGeneratingCaption(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-caption", {
+        body: {
+          title: titulo || product.title,
+          price: valor || product.price,
+          link: product.shortUrl || product.url,
+          style: captionStyle,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setCaption(data.caption || "");
+      toast.success("Legenda gerada com IA!");
+    } catch (e: any) {
+      console.error("Caption error:", e);
+      toast.error(e?.message || "Erro ao gerar legenda.");
+    } finally {
+      setGeneratingCaption(false);
+    }
+  }
+
+  async function copyCaption() {
+    await navigator.clipboard.writeText(caption);
+    setCopied(true);
+    toast.success("Legenda copiada!");
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  function handleNext() {
+    if (currentStep === 'template') {
+      setCurrentStep('caption');
+    } else if (currentStep === 'caption') {
+      setCurrentStep('download');
+    }
+  }
+
+  function handleBack() {
+    if (stepIndex > 0) {
+      setCurrentStep(stepOrder[stepIndex - 1]);
+    }
+  }
+
+  function handleReset() {
+    setCurrentStep('link');
+    setLink('');
+    setCaption('');
+    setTitulo('');
+    setValor('');
+    setCopied(false);
+  }
 
   return (
     <AppLayout>
@@ -92,11 +119,11 @@ const CreateArt = () => {
             <p className="text-sm text-muted-foreground">Siga as etapas para gerar seu post pronto</p>
           </div>
 
-          {/* Stepper Visual */}
+          {/* Stepper */}
           <div className="flex items-center justify-between max-w-2xl mx-auto relative px-4">
             <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-elevated -translate-y-1/2 z-0" />
-            <div 
-              className="absolute top-1/2 left-0 h-0.5 bg-primary -translate-y-1/2 z-0 transition-all duration-300" 
+            <div
+              className="absolute top-1/2 left-0 h-0.5 bg-primary -translate-y-1/2 z-0 transition-all duration-300"
               style={{ width: `${(stepIndex / (stepOrder.length - 1)) * 100}%` }}
             />
             {stepOrder.map((s, i) => (
@@ -109,7 +136,7 @@ const CreateArt = () => {
                 <span className={`text-[10px] uppercase tracking-widest font-medium transition-all ${
                   i <= stepIndex ? 'text-foreground' : 'text-muted-foreground'
                 }`}>
-                  {s === 'link' ? 'Link' : s === 'template' ? 'Template' : s === 'caption' ? 'Legenda' : s === 'shorten' ? 'Encurtar' : 'Fim'}
+                  {s === 'link' ? 'Link' : s === 'template' ? 'Template' : s === 'caption' ? 'Legenda' : 'Fim'}
                 </span>
               </div>
             ))}
@@ -117,10 +144,10 @@ const CreateArt = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-8">
-          {/* Main Panel Content */}
+          {/* Main Panel */}
           <div className="space-y-6">
             <div className="rounded-xl bg-surface border border-border/50 p-6 min-h-[400px] flex flex-col">
-              
+
               {/* Step: Link */}
               {currentStep === 'link' && (
                 <div className="flex-1 flex flex-col items-center justify-center space-y-6 animate-fade-in">
@@ -129,18 +156,19 @@ const CreateArt = () => {
                   </div>
                   <div className="text-center space-y-2 max-w-sm">
                     <h2 className="text-xl font-display font-bold text-foreground">Link do Produto</h2>
-                    <p className="text-sm text-muted-foreground">Cole o link da Shopee, Amazon, ML ou outros marketplaces.</p>
+                    <p className="text-sm text-muted-foreground">Cole o link da Shopee, Mercado Livre, Magazine Luiza ou outros.</p>
                   </div>
                   <div className="w-full max-w-md space-y-4">
-                    <input
+                    <Input
                       type="url"
                       value={link}
                       onChange={(e) => setLink(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleFetchProduct()}
                       placeholder="https://..."
-                      className="w-full h-12 bg-background border border-border rounded-lg px-4 text-sm text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                      className="h-12"
                     />
-                    <Button className="w-full" size="lg" onClick={handleNext} disabled={loading}>
-                      {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}
+                    <Button className="w-full" size="lg" onClick={handleFetchProduct} disabled={scraping}>
+                      {scraping ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}
                       Buscar Produto
                     </Button>
                   </div>
@@ -153,10 +181,29 @@ const CreateArt = () => {
                   <div className="flex items-center justify-between">
                     <h2 className="text-lg font-display font-bold text-foreground">Escolha o Estilo</h2>
                     <div className="flex gap-1 bg-elevated p-1 rounded-lg">
-                      <button onClick={() => setFormat('feed')} className={`px-3 py-1 text-xs rounded-md transition-all ${format === 'feed' ? 'bg-primary text-white' : 'text-muted-foreground'}`}>Feed</button>
-                      <button onClick={() => setFormat('stories')} className={`px-3 py-1 text-xs rounded-md transition-all ${format === 'stories' ? 'bg-primary text-white' : 'text-muted-foreground'}`}>Stories</button>
+                      <button onClick={() => setFormat('feed')} className={`px-3 py-1 text-xs rounded-md transition-all ${format === 'feed' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>Feed</button>
+                      <button onClick={() => setFormat('stories')} className={`px-3 py-1 text-xs rounded-md transition-all ${format === 'stories' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>Stories</button>
                     </div>
                   </div>
+
+                  {/* Product info summary */}
+                  {product && (
+                    <Card className="border-primary/20 bg-primary/5">
+                      <CardContent className="p-4 flex gap-4 items-center">
+                        {product.image && (
+                          <img src={product.image} alt={product.title} className="w-16 h-16 rounded-lg object-cover" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{product.title}</p>
+                          {product.price && <p className="text-lg font-bold text-primary">{product.price}</p>}
+                          {product.shortUrl && (
+                            <p className="text-xs text-muted-foreground truncate">🔗 {product.shortUrl}</p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {templates.filter(t => t.format.includes(format)).map((t) => (
                       <div
@@ -167,9 +214,12 @@ const CreateArt = () => {
                         }`}
                       >
                         <div className={`absolute inset-0 bg-gradient-to-br ${t.preview}`} />
-                        {/* White product area - 80% */}
                         <div className="absolute inset-[6%] top-[10%] bottom-[10%] bg-white rounded-lg flex flex-col items-center justify-center p-2 gap-1" style={{ height: '80%' }}>
-                          <img src={mockExtractedProduct.image} alt="" className="w-full flex-1 object-cover rounded" />
+                          {product?.image ? (
+                            <img src={product.image} alt="" className="w-full flex-1 object-cover rounded" />
+                          ) : (
+                            <div className="w-full flex-1 bg-muted rounded" />
+                          )}
                           <p className="text-[7px] font-bold text-gray-800 text-center leading-tight truncate w-full">{titulo}</p>
                           <span className="text-[8px] font-black text-gray-900">{valor}</span>
                         </div>
@@ -184,6 +234,19 @@ const CreateArt = () => {
                       </div>
                     ))}
                   </div>
+
+                  {/* Editable fields */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground uppercase">Título</label>
+                      <Input value={titulo} onChange={e => setTitulo(e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground uppercase">Preço</label>
+                      <Input value={valor} onChange={e => setValor(e.target.value)} />
+                    </div>
+                  </div>
+
                   <div className="pt-4 flex justify-between">
                     <Button variant="ghost" onClick={handleBack}><ArrowLeft className="w-4 h-4 mr-2" /> Voltar</Button>
                     <Button onClick={handleNext}>Continuar <ArrowRight className="w-4 h-4 ml-2" /></Button>
@@ -194,74 +257,52 @@ const CreateArt = () => {
               {/* Step: Caption */}
               {currentStep === 'caption' && (
                 <div className="space-y-5 animate-fade-in flex-1">
-                  <h2 className="text-lg font-display font-bold text-foreground">Personalize a Legenda</h2>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-xs text-muted-foreground uppercase">Título</label>
-                      <input value={titulo} onChange={e => setTitulo(e.target.value)} className="w-full h-9 bg-background border border-border rounded-lg px-3 text-sm" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs text-muted-foreground uppercase">Preço</label>
-                      <input value={valor} onChange={e => setValor(e.target.value)} className="w-full h-9 bg-background border border-border rounded-lg px-3 text-sm" />
-                    </div>
-                    <div className="space-y-1 col-span-2">
-                      <label className="text-xs text-muted-foreground uppercase">Tom da IA</label>
-                      <div className="flex gap-2">
-                        {['Séria', 'Profissional', 'Descontraída', 'Engraçada'].map(t => (
-                          <button 
-                            key={t}
-                            onClick={() => setTone(t.toLowerCase() as ToneType)}
-                            className={`flex-1 py-2 rounded-lg text-xs font-medium border transition-all ${
-                              tone === t.toLowerCase() ? 'bg-primary border-primary text-white' : 'bg-elevated border-transparent text-muted-foreground'
-                            }`}
-                          >
-                            {t}
-                          </button>
+                  <h2 className="text-lg font-display font-bold text-foreground">Gerar Legenda com IA</h2>
+
+                  <div className="space-y-3">
+                    <label className="text-xs text-muted-foreground uppercase">Estilo da legenda</label>
+                    <Select value={captionStyle} onValueChange={setCaptionStyle}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CAPTION_STYLES.map((s) => (
+                          <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                         ))}
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs text-muted-foreground uppercase">CTA (Botão)</label>
-                      <input value={cta} onChange={e => setCta(e.target.value)} className="w-full h-9 bg-background border border-border rounded-lg px-3 text-sm" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs text-muted-foreground uppercase">Rodapé</label>
-                      <input value={rodape} onChange={e => setRodape(e.target.value)} className="w-full h-9 bg-background border border-border rounded-lg px-3 text-sm" />
-                    </div>
+                      </SelectContent>
+                    </Select>
+
+                    <Button onClick={handleGenerateCaption} disabled={generatingCaption} className="w-full">
+                      {generatingCaption ? (
+                        <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Gerando...</>
+                      ) : (
+                        <><Sparkles className="w-4 h-4 mr-2" /> Gerar legenda com IA</>
+                      )}
+                    </Button>
                   </div>
+
+                  {caption && (
+                    <div className="relative">
+                      <Textarea
+                        value={caption}
+                        onChange={(e) => setCaption(e.target.value)}
+                        rows={6}
+                        className="pr-10"
+                      />
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="absolute top-2 right-2"
+                        onClick={copyCaption}
+                      >
+                        {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                  )}
+
                   <div className="pt-4 flex justify-between">
                     <Button variant="ghost" onClick={handleBack}><ArrowLeft className="w-4 h-4 mr-2" /> Voltar</Button>
-                    <Button onClick={handleNext}>Continuar <ArrowRight className="w-4 h-4 ml-2" /></Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Step: Shorten */}
-              {currentStep === 'shorten' && (
-                <div className="flex-1 flex flex-col items-center justify-center space-y-6 animate-fade-in">
-                  <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-                    <Scissors className="w-8 h-8 text-primary" />
-                  </div>
-                  <div className="text-center space-y-2 max-w-sm">
-                    <h2 className="text-xl font-display font-bold text-foreground">Encurtar Link</h2>
-                    <p className="text-sm text-muted-foreground">O link original será substituído por um reduzido na legenda.</p>
-                  </div>
-                  <div className="w-full max-w-md space-y-4">
-                    <div className="p-3 bg-elevated rounded-lg border border-border/50 text-xs text-muted-foreground truncate font-mono">
-                      {link}
-                    </div>
-                    {shortLink ? (
-                      <div className="p-3 bg-primary/10 rounded-lg border border-primary/30 text-sm text-primary font-bold font-mono flex items-center justify-between">
-                        {shortLink}
-                        <Check className="w-4 h-4" />
-                      </div>
-                    ) : (
-                      <Button className="w-full" variant="outline" size="lg" onClick={handleShorten} disabled={loading}>
-                        {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-                        Encurtar Agora
-                      </Button>
-                    )}
-                    <Button className="w-full" size="lg" onClick={handleNext}>Continuar</Button>
+                    <Button onClick={handleNext} disabled={!caption}>Finalizar <ArrowRight className="w-4 h-4 ml-2" /></Button>
                   </div>
                 </div>
               )}
@@ -278,23 +319,20 @@ const CreateArt = () => {
                       <p className="text-muted-foreground">Sua arte e legenda foram geradas com sucesso.</p>
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
-                    <Button size="lg" className="w-full" onClick={() => toast({ title: "Arte baixada!" })}>
+                    <Button size="lg" className="w-full" onClick={() => toast.success("Arte baixada!")}>
                       <Download className="w-4 h-4 mr-2" /> Download
                     </Button>
-                    <Button size="lg" variant="outline" className="w-full" onClick={() => {
-                        navigator.clipboard.writeText(caption);
-                        toast({ title: "Legenda copiada!" });
-                      }}>
+                    <Button size="lg" variant="outline" className="w-full" onClick={copyCaption}>
                       <Copy className="w-4 h-4 mr-2" /> Legenda
                     </Button>
                     <Button size="lg" variant="outline" className="w-full col-span-2" onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(caption)}`, '_blank')}>
                       <ExternalLink className="w-4 h-4 mr-2" /> WhatsApp
                     </Button>
                   </div>
-                  
-                  <Button variant="ghost" size="sm" onClick={() => setCurrentStep('link')}>
+
+                  <Button variant="ghost" size="sm" onClick={handleReset}>
                     <RefreshCw className="w-3 h-3 mr-2" /> Criar Outra
                   </Button>
                 </div>
@@ -303,33 +341,31 @@ const CreateArt = () => {
             </div>
           </div>
 
-          {/* Right Panel Preview (Visual) */}
+          {/* Right Panel Preview */}
           <div className="space-y-4">
             <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Pré-visualização</h3>
-            
-            {/* Template Preview */}
+
             <div className={`rounded-2xl border border-border/50 overflow-hidden shadow-2xl relative ${format === 'stories' ? 'aspect-[9/16]' : 'aspect-square'}`}>
-              <div className={`absolute inset-0 bg-gradient-to-br ${selectedTemplate.preview}`} />
-              {/* Top bar - template branding ~10% */}
+              <div className={`absolute inset-0 bg-gradient-to-br ${selectedTemplate?.preview || 'from-primary to-accent'}`} />
+              {/* Top bar */}
               <div className="absolute top-0 left-0 right-0 h-[10%] flex items-center justify-between px-4 z-10">
                 <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/80">Oferta Especial</span>
-                {currentUser.plan !== 'free' && (
-                  <div className="w-7 h-7 rounded-lg bg-white/20 backdrop-blur-md flex items-center justify-center text-[8px] font-bold text-white">LOGO</div>
-                )}
               </div>
-              {/* White product area - 80% */}
+              {/* Product area */}
               <div className="absolute left-[5%] right-[5%] top-[10%] bg-white rounded-xl flex flex-col items-center justify-center p-4 gap-3 shadow-lg" style={{ height: '80%' }}>
-                <img
-                  src={mockExtractedProduct.image}
-                  alt={titulo}
-                  className="w-full flex-1 object-cover rounded-lg"
-                />
-                <h3 className="text-sm font-display font-black text-gray-900 text-center leading-tight">{titulo}</h3>
+                {product?.image ? (
+                  <img src={product.image} alt={titulo} className="w-full flex-1 object-cover rounded-lg" />
+                ) : (
+                  <div className="w-full flex-1 bg-muted rounded-lg flex items-center justify-center text-muted-foreground text-sm">
+                    Imagem do Produto
+                  </div>
+                )}
+                <h3 className="text-sm font-display font-black text-gray-900 text-center leading-tight">{titulo || 'Nome do Produto'}</h3>
                 <div className="bg-gray-100 px-4 py-1.5 rounded-lg">
-                  <span className="text-xl font-black font-mono text-gray-900">{valor}</span>
+                  <span className="text-xl font-black font-mono text-gray-900">{valor || 'R$ --,--'}</span>
                 </div>
               </div>
-              {/* Bottom bar - CTA ~10% */}
+              {/* CTA bar */}
               <div className="absolute bottom-0 left-0 right-0 h-[10%] flex items-center justify-center z-10">
                 <div className="px-5 py-1.5 border-2 border-white/50 rounded-full">
                   <span className="text-[10px] font-bold text-white uppercase">{cta}</span>
@@ -337,17 +373,16 @@ const CreateArt = () => {
               </div>
             </div>
 
-            {/* Caption Preview */}
-            {currentStep !== 'link' && currentStep !== 'template' && (
+            {/* Caption preview */}
+            {caption && (
               <div className="rounded-xl bg-surface border border-border/50 p-4 space-y-3">
                 <div className="flex items-center justify-between border-b border-border/30 pb-2">
                   <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Legenda</span>
-                  <span className="text-[10px] font-bold text-primary uppercase">{tone}</span>
+                  <span className="text-[10px] font-bold text-primary uppercase">{captionStyle}</span>
                 </div>
                 <div className="text-[11px] text-foreground leading-relaxed whitespace-pre-line font-medium opacity-90">
-                  {caption || 'Aguardando geração...'}
+                  {caption}
                 </div>
-                {rodape && <div className="text-[10px] text-muted-foreground border-t border-border/30 pt-2">{rodape}</div>}
               </div>
             )}
           </div>
