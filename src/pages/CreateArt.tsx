@@ -364,7 +364,7 @@ const CreateArt = () => {
             <div
               id="template-preview"
               style={{ aspectRatio: '9/16' }}
-              className="w-[400px] rounded-2xl border border-border/50 overflow-hidden shadow-2xl relative"
+              className="w-full rounded-2xl border border-border/50 overflow-hidden shadow-2xl relative"
             >
               <div className={`absolute inset-0 bg-gradient-to-br ${selectedTemplate?.preview || 'from-primary to-accent'}`} />
               {/* Topo – 20% */}
