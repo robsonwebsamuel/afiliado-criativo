@@ -1,17 +1,17 @@
 import { AppLayout } from "@/components/AppLayout";
-import { useState, useRef } from "react";
-import html2canvas from "html2canvas";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Link2, Sparkles, Copy, RefreshCw, Download, Check, Loader2, ArrowLeft, ArrowRight, ExternalLink } from "lucide-react";
+import { Link2, Sparkles, Copy, RefreshCw, Check, Loader2, ArrowLeft, ArrowRight, ExternalLink } from "lucide-react";
 import { useProductScraper } from "@/hooks/useProductScraper";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { templates } from "@/lib/mock-data";
 import { formatPrice } from "@/lib/formatPrice";
+import { DownloadArtButton } from "@/components/DownloadArtButton";
 
 type Step = 'link' | 'template' | 'caption' | 'download';
 
