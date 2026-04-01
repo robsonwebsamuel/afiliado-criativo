@@ -217,8 +217,8 @@ const CreateArt = () => {
                       >
                         <div className={`absolute inset-0 bg-gradient-to-br ${t.preview}`} />
                         <div className="absolute inset-[6%] top-[10%] bottom-[10%] bg-white rounded-lg flex flex-col items-center justify-center p-2 gap-1" style={{ height: '80%' }}>
-                          {product?.image ? (
-                            <img src={product.image} alt="" className="w-full flex-1 object-cover rounded" />
+                          {displayImage ? (
+                            <img src={displayImage} alt="" className="w-full flex-1 object-cover rounded" />
                           ) : (
                             <div className="w-full flex-1 bg-muted rounded" />
                           )}
