@@ -16,6 +16,7 @@ export default {
       fontFamily: {
         display: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
         body: ['Inter', 'system-ui', 'sans-serif'],
+        montserrat: ['Montserrat', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",
