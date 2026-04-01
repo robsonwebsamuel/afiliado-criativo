@@ -42,6 +42,7 @@ const CreateArt = () => {
   const stepIndex = stepOrder.indexOf(currentStep);
 
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId) || templates[0];
+  const displayImage = manualImageUrl || product?.image || '';
 
   async function handleFetchProduct() {
     if (!link.trim()) {
