@@ -328,21 +328,30 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Fallback: scrape HTML + extract from ML-specific patterns
-      console.log("ML API incomplete, trying HTML scrape...");
+      // Fallback: scrape HTML + extract from ML-specific patterns + URL slug
+      console.log("ML API incomplete, trying HTML scrape + URL slug...");
       const { html, finalUrl } = await fetchHtml(url);
       const meliData = extractMeliFromInitialState(html);
       const doc = new DOMParser().parseFromString(html, "text/html");
       const jsonLd = extractJsonLd(html);
+      const urlTitle = extractTitleFromUrl(url);
 
       const getMeta = (name: string) =>
         doc?.querySelector(`meta[property='${name}']`)?.getAttribute("content") ||
         doc?.querySelector(`meta[name='${name}']`)?.getAttribute("content") || "";
 
-      const title = decodeHtmlEntities(
-        meliData.title || apiData.title || jsonLd?.name || getMeta("og:title") ||
-        doc?.querySelector("h1")?.textContent?.trim() || "Produto"
-      ).replace(/\s*\|.*$/, "").replace(/\s*-\s*(Mercado|MercadoL).*$/i, "").trim() || "Produto";
+      // Filter out cookie/verification page titles
+      const isJunkTitle = (t: string) => /prefer[eê]ncia|cookie|verifica/i.test(t);
+
+      let rawTitle = meliData.title || apiData.title || jsonLd?.name || getMeta("og:title") ||
+        doc?.querySelector("h1")?.textContent?.trim() || "";
+      
+      if (!rawTitle || isJunkTitle(rawTitle)) {
+        rawTitle = urlTitle || "Produto";
+      }
+
+      const title = decodeHtmlEntities(rawTitle)
+        .replace(/\s*\|.*$/, "").replace(/\s*-\s*(Mercado|MercadoL).*$/i, "").trim() || "Produto";
 
       const price = meliData.price || apiData.price || (jsonLd ? extractPriceFromJsonLd(jsonLd) : "") ||
         (html.match(/R\$\s*[\d]+[.,][\d]{2}/)?.[0] || "");
@@ -351,7 +360,7 @@ Deno.serve(async (req) => {
         (jsonLd ? extractImagesFromJsonLd(jsonLd).filter(isValidImageUrl)[0] : "") ||
         (getMeta("og:image") && isValidImageUrl(getMeta("og:image")) ? getMeta("og:image") : "") || "";
 
-      console.log("ML final:", { title: title.substring(0, 60), price, hasImage: !!image });
+      console.log("ML final:", { title: title.substring(0, 60), price, hasImage: !!image, source: urlTitle ? "url-slug" : "scrape" });
       return new Response(
         JSON.stringify({ title, image, description: getMeta("og:description") || "", price, url: finalUrl }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
