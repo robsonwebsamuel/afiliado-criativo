@@ -114,39 +114,6 @@ const CreateArt = () => {
     setCopied(false);
   }
 
-  async function handleDownload() {
-    const el = previewRef.current;
-    if (!el) return;
-    try {
-      toast.loading("Gerando imagem...", { id: "download" });
-      const canvas = await html2canvas(el, {
-        width: 1080,
-        height: 1920,
-        scale: 1,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: null,
-        onclone: (clonedDoc) => {
-          const clonedEl = clonedDoc.getElementById("template-preview");
-          if (clonedEl) {
-            clonedEl.style.width = "1080px";
-            clonedEl.style.height = "1920px";
-            clonedEl.style.borderRadius = "0";
-            clonedEl.style.border = "none";
-          }
-        },
-      });
-      const dataUrl = canvas.toDataURL("image/png");
-      const a = document.createElement("a");
-      a.href = dataUrl;
-      a.download = `arte-${Date.now()}.png`;
-      a.click();
-      toast.success("Arte baixada com sucesso!", { id: "download" });
-    } catch (err) {
-      console.error("Download error:", err);
-      toast.error("Erro ao gerar imagem", { id: "download" });
-    }
-  }
 
   return (
     <AppLayout>
