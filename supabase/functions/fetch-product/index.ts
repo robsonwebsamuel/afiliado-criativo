@@ -29,6 +29,10 @@ function isValidImageUrl(url: string): boolean {
     "fls-na.amazon", "fls-eu.amazon",
     "images-na.ssl-images-amazon.com/images/G/01/x-locale",
     "data:image", "svg+xml",
+    // ML logos and non-product images
+    "mercadolibre.com/org-img", "mercadolivre.com/org-img",
+    "meli-incubator", "frontend-assets",
+    "/nav-header", "/logo", "/favicon",
   ];
   return !blacklist.some(b => url.toLowerCase().includes(b));
 }
