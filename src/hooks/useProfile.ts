@@ -33,22 +33,6 @@ export function useProfile() {
     };
 
     fetchProfile();
-
-    const channelName = `profile-changes-${user.id}-${Date.now()}`;
-    const channel = supabase
-      .channel(channelName)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'profiles',
-        filter: `user_id=eq.${user.id}`,
-      }, (payload) => {
-        const d = payload.new as any;
-        setProfile({ display_name: d.display_name, avatar_url: d.avatar_url, plan: d.plan as PlanType });
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
   }, [user]);
 
   return { profile, loading };
