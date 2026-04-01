@@ -219,9 +219,45 @@ async function fetchMeliApi(url: string): Promise<{ title?: string; price?: stri
   if (catalogId) {
     console.log("ML API: trying catalog search for", catalogId);
     try {
-      // Search for items in this catalog
       const searchRes = await fetch(
         `https://api.mercadolibre.com/sites/MLB/search?catalog_product_id=${catalogId}&limit=1`,
+        { headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" } }
+      );
+      console.log("ML catalog search status:", searchRes.status);
+      if (searchRes.ok) {
+        const searchData = await searchRes.json();
+        console.log("ML catalog search results count:", searchData.results?.length);
+        const firstResult = searchData.results?.[0];
+        if (firstResult) {
+          const result: { title?: string; price?: string; image?: string } = {};
+          result.title = firstResult.title;
+          if (firstResult.price) {
+            result.price = `R$ ${parseFloat(firstResult.price).toFixed(2).replace(".", ",")}`;
+          }
+          if (firstResult.thumbnail) {
+            result.image = firstResult.thumbnail
+              .replace(/-[A-Z]\.jpg/, "-O.jpg")
+              .replace("http://", "https://");
+          }
+          console.log("ML catalog search result:", { title: result.title?.substring(0, 50), price: result.price, hasImage: !!result.image });
+          if (result.title && result.price) return result;
+        }
+      } else {
+        const errText = await searchRes.text();
+        console.log("ML catalog search error:", errText.substring(0, 200));
+      }
+    } catch (e) {
+      console.log("ML catalog search failed:", e);
+    }
+  }
+
+  // Try search by product name from URL slug
+  const urlTitle = extractTitleFromUrl(url);
+  if (urlTitle && urlTitle.length > 5) {
+    console.log("ML API: trying search by name:", urlTitle);
+    try {
+      const searchRes = await fetch(
+        `https://api.mercadolibre.com/sites/MLB/search?q=${encodeURIComponent(urlTitle)}&limit=1`,
         { headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" } }
       );
       if (searchRes.ok) {
@@ -238,12 +274,12 @@ async function fetchMeliApi(url: string): Promise<{ title?: string; price?: stri
               .replace(/-[A-Z]\.jpg/, "-O.jpg")
               .replace("http://", "https://");
           }
-          console.log("ML catalog search result:", { title: result.title?.substring(0, 50), price: result.price, hasImage: !!result.image });
-          if (result.title && result.price) return result;
+          console.log("ML name search result:", { title: result.title?.substring(0, 50), price: result.price, hasImage: !!result.image });
+          if (result.title && result.price && result.image) return result;
         }
       }
     } catch (e) {
-      console.log("ML catalog search failed:", e);
+      console.log("ML name search failed:", e);
     }
   }
   
