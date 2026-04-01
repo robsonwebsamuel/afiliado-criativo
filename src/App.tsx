@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { ProtectedRoute, AdminRoute } from "@/components/ProtectedRoute";
 import Dashboard from "./pages/Dashboard";
 import CreateArt from "./pages/CreateArt";
 import Templates from "./pages/Templates";
@@ -63,11 +63,11 @@ const App = () => (
               <Route path="/conta" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
 
               {/* Protected admin routes */}
-              <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
-              <Route path="/admin/usuarios" element={<ProtectedRoute><AdminUsers /></ProtectedRoute>} />
-              <Route path="/admin/planos" element={<ProtectedRoute><AdminPlans /></ProtectedRoute>} />
-              <Route path="/admin/templates" element={<ProtectedRoute><AdminTemplates /></ProtectedRoute>} />
-              <Route path="/admin/integracoes" element={<ProtectedRoute><AdminIntegrations /></ProtectedRoute>} />
+              <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+              <Route path="/admin/usuarios" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+              <Route path="/admin/planos" element={<AdminRoute><AdminPlans /></AdminRoute>} />
+              <Route path="/admin/templates" element={<AdminRoute><AdminTemplates /></AdminRoute>} />
+              <Route path="/admin/integracoes" element={<AdminRoute><AdminIntegrations /></AdminRoute>} />
 
               <Route path="*" element={<NotFound />} />
             </Routes>
