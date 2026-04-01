@@ -1,42 +1,13 @@
-import { useAuth } from '@/contexts/AuthContext';
-import { Navigate } from 'react-router-dom';
+import { ReactNode } from "react";
 
-export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
+// TODO: reativar autenticação e redirecionamento antes do deploy em produção
+export function ProtectedRoute({ children }: { children: ReactNode }) {
+  // Autenticação temporariamente desativada para desenvolvimento
   return <>{children}</>;
 }
 
-export function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading, isAdmin } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (!isAdmin) {
-    return <Navigate to="/" replace />;
-  }
-
+// TODO: reativar verificação de admin antes do deploy em produção
+export function AdminRoute({ children }: { children: ReactNode }) {
+  // Verificação de admin temporariamente desativada para desenvolvimento
   return <>{children}</>;
 }

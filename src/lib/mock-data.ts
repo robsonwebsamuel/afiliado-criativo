@@ -84,7 +84,7 @@ export const planLimits: Record<PlanType, {
     captionLimit: 3,
   },
   standard: {
-    daily: 10,
+    daily: Infinity,
     templates: 10,
     formats: ['feed', 'stories'],
     hasLogo: true,
@@ -161,12 +161,12 @@ export const planDetails = [
   {
     name: 'Standard',
     type: 'standard' as PlanType,
-    monthlyPrice: 'R$ 59,00',
+    monthlyPrice: 'R$ 39,90',
     annualPrice: 'R$ 29,00',
     period: '/mês',
     highlight: false,
     features: [
-      '10 artes por dia',
+      'Artes ilimitadas por dia',
       '10 templates (Feed e Stories)',
       'Upload do seu Logo',
       'Legendas ilimitadas com IA',
@@ -177,7 +177,7 @@ export const planDetails = [
   {
     name: 'Pro',
     type: 'pro' as PlanType,
-    monthlyPrice: 'R$ 79,00',
+    monthlyPrice: 'R$ 59,90',
     annualPrice: 'R$ 49,00',
     period: '/mês',
     highlight: true,
