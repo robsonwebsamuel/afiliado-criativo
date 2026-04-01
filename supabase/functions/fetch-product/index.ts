@@ -205,29 +205,42 @@ function extractMeliFromInitialState(html: string): { title?: string; price?: st
   return result;
 }
 
-// ── Mercado Livre API fallback ──
+// ── Mercado Livre API ──
 async function fetchMeliApi(url: string): Promise<{ title?: string; price?: string; image?: string }> {
-  // Extract item ID from URL (e.g., MLB27391145 or MLB-27391145)
-  const idMatch = url.match(/ML[AB]\d+/i) || url.match(/ML[AB]-?\d+/i);
-  if (!idMatch) return {};
+  // Extract item ID from URL — supports MLB27391145, MLB-27391145, /p/MLB27391145
+  const idMatch = url.match(/ML[AB]-?\d+/i);
+  if (!idMatch) {
+    console.log("ML API: no item ID found in URL");
+    return {};
+  }
 
-  const itemId = idMatch[0].replace("-", "");
+  const itemId = idMatch[0].replace("-", "").toUpperCase();
+  console.log("ML API: fetching item", itemId);
   try {
     const res = await fetch(`https://api.mercadolibre.com/items/${itemId}`, {
-      headers: { "Accept": "application/json" },
+      headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" },
     });
-    if (!res.ok) return {};
+    console.log("ML API response status:", res.status);
+    if (!res.ok) {
+      const errText = await res.text();
+      console.log("ML API error:", errText.substring(0, 200));
+      return {};
+    }
     const data = await res.json();
+    console.log("ML API data:", { title: data.title?.substring(0, 50), price: data.price, hasPictures: !!data.pictures?.length });
     const result: { title?: string; price?: string; image?: string } = {};
     if (data.title) result.title = data.title;
     if (data.price) result.price = `R$ ${parseFloat(data.price).toFixed(2).replace(".", ",")}`;
     if (data.pictures?.[0]?.secure_url) {
       result.image = data.pictures[0].secure_url;
+    } else if (data.secure_thumbnail) {
+      result.image = data.secure_thumbnail.replace(/-[OIFR]\.jpg/, "-O.jpg");
     } else if (data.thumbnail) {
-      result.image = data.thumbnail.replace(/-[OIFR]\.jpg/, "-O.jpg");
+      result.image = data.thumbnail.replace(/-[OIFR]\.jpg/, "-O.jpg").replace("http://", "https://");
     }
     return result;
-  } catch {
+  } catch (e) {
+    console.error("ML API fetch error:", e);
     return {};
   }
 }
