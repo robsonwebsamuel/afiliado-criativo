@@ -205,17 +205,41 @@ function extractMeliFromInitialState(html: string): { title?: string; price?: st
   return result;
 }
 
-// ── Mercado Livre API fallback ──
-async function fetchMeliApi(url: string): Promise<{ title?: string; price?: string; image?: string }> {
-  // Extract item ID from URL (e.g., MLB27391145 or MLB-27391145)
-  const idMatch = url.match(/ML[AB]\d+/i) || url.match(/ML[AB]-?\d+/i);
-  if (!idMatch) return {};
+// ── Extract product name from URL slug ──
+function extractTitleFromUrl(url: string): string {
+  try {
+    const pathname = new URL(url).pathname;
+    // ML URLs: /product-name-here/p/MLB123 or /product-name-here_MLB123
+    const segments = pathname.split("/").filter(Boolean);
+    // Find the segment before "/p/" or the first long segment
+    const pIndex = segments.indexOf("p");
+    const slugSegment = pIndex > 0 ? segments[pIndex - 1] : segments[0] || "";
+    if (slugSegment && slugSegment.length > 3) {
+      return slugSegment
+        .replace(/-/g, " ")
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase())
+        .trim();
+    }
+  } catch { /* */ }
+  return "";
+}
 
-  const itemId = idMatch[0].replace("-", "");
+// ── Mercado Livre API ──
+async function fetchMeliApi(url: string): Promise<{ title?: string; price?: string; image?: string }> {
+  const idMatch = url.match(/ML[AB]-?\d+/i);
+  if (!idMatch) {
+    console.log("ML API: no item ID found in URL");
+    return {};
+  }
+
+  const itemId = idMatch[0].replace("-", "").toUpperCase();
+  console.log("ML API: fetching item", itemId);
   try {
     const res = await fetch(`https://api.mercadolibre.com/items/${itemId}`, {
-      headers: { "Accept": "application/json" },
+      headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" },
     });
+    console.log("ML API response status:", res.status);
     if (!res.ok) return {};
     const data = await res.json();
     const result: { title?: string; price?: string; image?: string } = {};
@@ -223,11 +247,14 @@ async function fetchMeliApi(url: string): Promise<{ title?: string; price?: stri
     if (data.price) result.price = `R$ ${parseFloat(data.price).toFixed(2).replace(".", ",")}`;
     if (data.pictures?.[0]?.secure_url) {
       result.image = data.pictures[0].secure_url;
+    } else if (data.secure_thumbnail) {
+      result.image = data.secure_thumbnail.replace(/-[OIFR]\.jpg/, "-O.jpg");
     } else if (data.thumbnail) {
-      result.image = data.thumbnail.replace(/-[OIFR]\.jpg/, "-O.jpg");
+      result.image = data.thumbnail.replace(/-[OIFR]\.jpg/, "-O.jpg").replace("http://", "https://");
     }
     return result;
-  } catch {
+  } catch (e) {
+    console.error("ML API fetch error:", e);
     return {};
   }
 }
@@ -301,21 +328,30 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Fallback: scrape HTML + extract from ML-specific patterns
-      console.log("ML API incomplete, trying HTML scrape...");
+      // Fallback: scrape HTML + extract from ML-specific patterns + URL slug
+      console.log("ML API incomplete, trying HTML scrape + URL slug...");
       const { html, finalUrl } = await fetchHtml(url);
       const meliData = extractMeliFromInitialState(html);
       const doc = new DOMParser().parseFromString(html, "text/html");
       const jsonLd = extractJsonLd(html);
+      const urlTitle = extractTitleFromUrl(url);
 
       const getMeta = (name: string) =>
         doc?.querySelector(`meta[property='${name}']`)?.getAttribute("content") ||
         doc?.querySelector(`meta[name='${name}']`)?.getAttribute("content") || "";
 
-      const title = decodeHtmlEntities(
-        meliData.title || apiData.title || jsonLd?.name || getMeta("og:title") ||
-        doc?.querySelector("h1")?.textContent?.trim() || "Produto"
-      ).replace(/\s*\|.*$/, "").replace(/\s*-\s*(Mercado|MercadoL).*$/i, "").trim() || "Produto";
+      // Filter out cookie/verification page titles
+      const isJunkTitle = (t: string) => /prefer[eê]ncia|cookie|verifica/i.test(t);
+
+      let rawTitle = meliData.title || apiData.title || jsonLd?.name || getMeta("og:title") ||
+        doc?.querySelector("h1")?.textContent?.trim() || "";
+      
+      if (!rawTitle || isJunkTitle(rawTitle)) {
+        rawTitle = urlTitle || "Produto";
+      }
+
+      const title = decodeHtmlEntities(rawTitle)
+        .replace(/\s*\|.*$/, "").replace(/\s*-\s*(Mercado|MercadoL).*$/i, "").trim() || "Produto";
 
       const price = meliData.price || apiData.price || (jsonLd ? extractPriceFromJsonLd(jsonLd) : "") ||
         (html.match(/R\$\s*[\d]+[.,][\d]{2}/)?.[0] || "");
@@ -324,7 +360,7 @@ Deno.serve(async (req) => {
         (jsonLd ? extractImagesFromJsonLd(jsonLd).filter(isValidImageUrl)[0] : "") ||
         (getMeta("og:image") && isValidImageUrl(getMeta("og:image")) ? getMeta("og:image") : "") || "";
 
-      console.log("ML final:", { title: title.substring(0, 60), price, hasImage: !!image });
+      console.log("ML final:", { title: title.substring(0, 60), price, hasImage: !!image, source: urlTitle ? "url-slug" : "scrape" });
       return new Response(
         JSON.stringify({ title, image, description: getMeta("og:description") || "", price, url: finalUrl }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
