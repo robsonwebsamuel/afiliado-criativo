@@ -197,7 +197,12 @@ const CreateArt = () => {
                     <Card className="border-primary/20 bg-primary/5">
                       <CardContent className="p-4 flex gap-4 items-center">
                         {displayImage && (
-                          <img src={displayImage} alt={product.title} className="w-16 h-16 rounded-lg object-cover" />
+                          <img 
+                            src={displayImage} 
+                            alt={product.title} 
+                            className="w-16 h-16 rounded-lg object-cover" 
+                            referrerPolicy="no-referrer"
+                          />
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-foreground truncate">{product.title}</p>
@@ -228,7 +233,12 @@ const CreateArt = () => {
                         {/* Center: product image */}
                         <div className="absolute left-[6%] right-[6%] top-[18%] bottom-[30%] bg-white rounded-lg flex items-center justify-center p-1.5 overflow-hidden">
                           {displayImage ? (
-                            <img src={displayImage} alt="" className="w-full h-full object-contain rounded" />
+                            <img 
+                              src={displayImage} 
+                              alt="" 
+                              className="w-full h-full object-contain rounded" 
+                              referrerPolicy="no-referrer"
+                            />
                           ) : (
                             <div className="w-full h-full bg-muted rounded" />
                           )}
@@ -383,7 +393,13 @@ const CreateArt = () => {
               {/* Centro – 50% imagem */}
               <div className="absolute left-[5%] right-[5%] top-[20%] h-[50%] bg-white rounded-xl flex items-center justify-center p-4 shadow-lg">
                 {displayImage ? (
-                  <img src={displayImage} alt={titulo} crossOrigin="anonymous" className="max-h-full max-w-full object-contain rounded-lg drop-shadow-2xl" />
+                  <img 
+                    src={displayImage} 
+                    alt={titulo} 
+                    crossOrigin="anonymous" 
+                    referrerPolicy="no-referrer"
+                    className="max-h-full max-w-full object-contain rounded-lg drop-shadow-2xl" 
+                  />
                 ) : (
                   <div className="w-full h-full bg-muted rounded-lg flex items-center justify-center text-muted-foreground text-sm">
                     Imagem do Produto

@@ -7,6 +7,7 @@ const corsHeaders = {
 };
 
 function decodeHtmlEntities(text: string): string {
+  if (!text) return "";
   return text
     .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&apos;/g, "'")
@@ -17,8 +18,27 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&#x[0-9a-fA-F]+;/g, (m) => String.fromCharCode(parseInt(m.slice(3, -1), 16)))
     .replace(/&[a-zA-Z]+;/g, "")
     .replace(/\u200B/g, "").replace(/\u200C/g, "").replace(/\u200D/g, "").replace(/\uFEFF/g, "")
-    .replace(/\s{2,}/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
+}
+
+function extractJsonState(html: string, varName: string): any {
+  try {
+    const regex = new RegExp(`window\\.${varName}\\s*=\\s*({[\\s\\S]*?});`, "i");
+    const match = html.match(regex);
+    if (match && match[1]) {
+      return JSON.parse(match[1]);
+    }
+  } catch { /* */ }
+  // Try another format: script tag with just JSON
+  try {
+    const regex = new RegExp(`<script[^>]*>window\\.${varName}\\s*=\\s*({[\\s\\S]*?})<\\/script>`, "i");
+    const match = html.match(regex);
+    if (match && match[1]) {
+      return JSON.parse(match[1]);
+    }
+  } catch { /* */ }
+  return null;
 }
 
 function isValidImageUrl(url: string): boolean {
@@ -328,59 +348,60 @@ async function fetchMeliApi(url: string): Promise<{ title?: string; price?: stri
 function extractMeliFromHtml(html: string): { title?: string; price?: string; image?: string } {
   const result: { title?: string; price?: string; image?: string } = {};
 
-  // Title patterns
+  // 1. Try __PRELOADED_STATE__
+  const state = extractJsonState(html, "__PRELOADED_STATE__");
+  if (state) {
+    console.log("ML: Found __PRELOADED_STATE__");
+    try {
+      const item = state.initialState?.pdp?.item;
+      if (item) {
+        result.title = item.title;
+        if (item.price?.amount) {
+          result.price = `R$ ${parseFloat(item.price.amount).toFixed(2).replace(".", ",")}`;
+        }
+        if (item.pictures?.length > 0) {
+          result.image = item.pictures[0].url?.replace(/-[A-Z]\.jpg/, "-O.jpg");
+        }
+      }
+      if (result.title && result.price) return result;
+    } catch { /* */ }
+  }
+
+  // 2. Fallback to Regex patterns
   const titlePatterns = [
-    /class="ui-pdp-title"[^>]*>([^<]+)/,
     /class="ui-pdp-title"[^>]*>([^<]+)/,
     /data-testid="pdp-title"[^>]*>([^<]+)/,
     /"title"\s*:\s*"([^"]{10,200})"/,
-    /"product_title"\s*:\s*"([^"]{10,200})"/,
   ];
   for (const p of titlePatterns) {
     const m = html.match(p);
     if (m && m[1] && !m[1].includes("{") && !isJunkTitle(m[1])) {
-      result.title = m[1].trim();
+      result.title = decodeHtmlEntities(m[1].trim());
       break;
     }
   }
 
-  // Price patterns - more aggressive
   const pricePatterns = [
     /itemprop="price"\s+content="([\d.]+)"/,
     /property="product:price:amount"\s+content="([\d.]+)"/,
     /class="andes-money-amount__fraction"[^>]*>([\d.]+)/,
-    /"price"\s*:\s*([\d]+(?:\.\d+)?)\s*[,}]/,
-    /"amount"\s*:\s*([\d]+(?:\.\d+)?)\s*[,}]/,
-    /"sale_price"\s*:\s*([\d]+(?:\.\d+)?)/,
-    /R\$\s*([\d]{1,3}(?:\.?\d{3})*(?:,\d{2})?)/,
+    /primary-price.*?>\s*R\$\s*([\d.,]+)/is,
   ];
   for (const p of pricePatterns) {
     const m = html.match(p);
     if (m && m[1]) {
-      let raw = m[1];
-      let num: number;
-      if (raw.includes(",") && raw.includes(".")) {
-        num = parseFloat(raw.replace(/\./g, "").replace(",", "."));
-      } else if (raw.includes(",")) {
-        num = parseFloat(raw.replace(",", "."));
-      } else {
-        num = parseFloat(raw);
-      }
-      if (!isNaN(num) && num > 1 && num < 1_000_000) {
+      let raw = m[1].replace(/\./g, "").replace(",", ".");
+      const num = parseFloat(raw);
+      if (!isNaN(num) && num > 1) {
         result.price = `R$ ${num.toFixed(2).replace(".", ",")}`;
         break;
       }
     }
   }
 
-  // Image from ML CDN - look for product images specifically
   const imgPatterns = [
-    // D_ prefix is the product image pattern on mlstatic
-    /"(https?:\/\/http2\.mlstatic\.com\/D_[^"]+\.(?:jpg|jpeg|webp|png)[^"]*)"/,
-    /"(https?:\/\/[^"]*mlstatic\.com\/D_[^"]+)"/,
-    // og:image from meta tags (most reliable for ML)
     /property="og:image"\s+content="(https?:\/\/[^"]+)"/,
-    /content="(https?:\/\/[^"]+mlstatic\.com[^"]+\.(?:jpg|jpeg|webp|png)[^"]*)"/,
+    /"(https?:\/\/http2\.mlstatic\.com\/D_[^"]+\.(?:jpg|jpeg|webp|png)[^"]*)"/,
   ];
   for (const p of imgPatterns) {
     const m = html.match(p);
@@ -546,18 +567,37 @@ function isShopee(url: string): boolean {
 function extractShopeeData(html: string): { title?: string; price?: string; image?: string } {
   const result: { title?: string; price?: string; image?: string } = {};
   
-  // Shopee embeds product data in script tags
+  // 1. Try __INITIAL_STATE__
+  const state = extractJsonState(html, "__INITIAL_STATE__");
+  if (state) {
+    console.log("Shopee: Found __INITIAL_STATE__");
+    try {
+      const item = state.item || state.productDetail?.item;
+      if (item) {
+        result.title = item.name;
+        if (item.price) {
+          const num = item.price / 100000; // Shopee cents format
+          result.price = `R$ ${num.toFixed(2).replace(".", ",")}`;
+        }
+        if (item.image) {
+          result.image = `https://cf.shopee.com.br/file/${item.image}`;
+        } else if (item.images?.length > 0) {
+          result.image = `https://cf.shopee.com.br/file/${item.images[0]}`;
+        }
+      }
+      if (result.title && result.price) return result;
+    } catch { /* */ }
+  }
+
+  // 2. Fallback to Regex patterns
   const nameMatch = html.match(/"name"\s*:\s*"([^"]{5,200})"/);
-  if (nameMatch && !isJunkTitle(nameMatch[1])) result.title = nameMatch[1];
+  if (nameMatch && !isJunkTitle(nameMatch[1])) result.title = decodeHtmlEntities(nameMatch[1]);
   
   const priceMatch = html.match(/"price"\s*:\s*(\d+)/);
   if (priceMatch) {
-    // Shopee prices are in cents (multiply by 100000)
     let num = parseInt(priceMatch[1]);
-    if (num > 100000) num = num / 100000; // Shopee uses this format
-    if (num > 0.5 && num < 1_000_000) {
-      result.price = `R$ ${num.toFixed(2).replace(".", ",")}`;
-    }
+    if (num > 100000) num = num / 100000;
+    if (num > 0.5) result.price = `R$ ${num.toFixed(2).replace(".", ",")}`;
   }
   
   const imgMatch = html.match(/"image"\s*:\s*"(https?:\/\/[^"]+)"/);
