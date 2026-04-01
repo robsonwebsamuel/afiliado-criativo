@@ -594,10 +594,18 @@ Deno.serve(async (req) => {
 
       // Fallback to HTML scrape
       const { html, finalUrl } = await fetchHtml(url);
+      console.log("ML HTML length:", html.length);
+      
       const meliHtml = extractMeliFromHtml(html);
+      console.log("ML HTML extraction:", { title: meliHtml.title?.substring(0, 40), price: meliHtml.price, hasImage: !!meliHtml.image });
+      
       const doc = new DOMParser().parseFromString(html, "text/html");
       const jsonLd = extractJsonLd(html);
       const urlTitle = extractTitleFromUrl(url);
+      
+      // Also try og:image directly from meta
+      const ogImage = doc?.querySelector("meta[property='og:image']")?.getAttribute("content") || "";
+      console.log("ML og:image:", ogImage?.substring(0, 80));
 
       const title = cleanTitle(
         apiData.title || meliHtml.title || jsonLd?.name ||
@@ -611,10 +619,11 @@ Deno.serve(async (req) => {
         extractPriceFromHtml(html);
 
       const image = apiData.image || meliHtml.image ||
+        (ogImage && isValidImageUrl(ogImage) ? ogImage : "") ||
         (jsonLd ? extractImagesFromJsonLd(jsonLd).filter(isValidImageUrl)[0] : "") ||
         findProductImages(doc, html)[0] || "";
 
-      console.log("ML result:", { title: title.substring(0, 50), price, hasImage: !!image });
+      console.log("ML result:", { title: title.substring(0, 50), price, hasImage: !!image, imageUrl: image?.substring(0, 60) });
       return new Response(
         JSON.stringify({ title, image, description: "", price, url: finalUrl }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
