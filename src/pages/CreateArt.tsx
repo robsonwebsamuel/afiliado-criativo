@@ -10,6 +10,7 @@ import { useProductScraper } from "@/hooks/useProductScraper";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { templates } from "@/lib/mock-data";
+import { formatPrice } from "@/lib/formatPrice";
 
 type Step = 'link' | 'template' | 'caption' | 'download';
 
