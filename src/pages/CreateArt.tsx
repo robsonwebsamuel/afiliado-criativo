@@ -148,8 +148,8 @@ const CreateArt = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-8">
           {/* Main Panel */}
-          <div className="space-y-6">
-            <div className="rounded-xl bg-surface border border-border/50 p-6 min-h-[400px] flex flex-col">
+          <div className="space-y-6 min-w-0">
+            <div className="rounded-xl bg-surface border border-border/50 p-6 min-h-[400px] flex flex-col overflow-hidden">
 
               {/* Step: Link */}
               {currentStep === 'link' && (
