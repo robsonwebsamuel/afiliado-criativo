@@ -6,6 +6,19 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function isValidImageUrl(url: string): boolean {
+  if (!url) return false;
+  // Filter out tracking pixels, 1x1 images, analytics URLs
+  const blacklist = [
+    "uedata", "pixel", "beacon", "tracking", "analytics",
+    "1x1", "spacer", "blank", "transparent", "logo", "icon",
+    "sprite", "badge", "fls-na.amazon", "fls-eu.amazon",
+    "images-na.ssl-images-amazon.com/images/G/01/x-locale",
+  ];
+  const lower = url.toLowerCase();
+  return !blacklist.some(b => lower.includes(b));
+}
+
 function extractJsonLd(html: string): Record<string, any> | null {
   try {
     const matches = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
@@ -13,11 +26,18 @@ function extractJsonLd(html: string): Record<string, any> | null {
     for (const match of matches) {
       const json = match.replace(/<script[^>]*>/i, "").replace(/<\/script>/i, "").trim();
       const parsed = JSON.parse(json);
-      // Handle arrays of JSON-LD
       const items = Array.isArray(parsed) ? parsed : [parsed];
       for (const item of items) {
         if (item["@type"] === "Product" || item["@type"]?.includes?.("Product")) {
           return item;
+        }
+        // Check @graph
+        if (item["@graph"]) {
+          for (const g of item["@graph"]) {
+            if (g["@type"] === "Product" || g["@type"]?.includes?.("Product")) {
+              return g;
+            }
+          }
         }
       }
     }
@@ -34,30 +54,68 @@ function extractPriceFromJsonLd(jsonLd: Record<string, any>): string {
     const offer = Array.isArray(offers) ? offers[0] : offers;
     const price = offer?.price || offer?.lowPrice;
     if (price) {
-      const currency = offer?.priceCurrency || "BRL";
-      const num = parseFloat(price);
-      if (!isNaN(num) && currency === "BRL") {
+      const num = parseFloat(String(price).replace(",", "."));
+      if (!isNaN(num)) {
         return `R$ ${num.toFixed(2).replace(".", ",")}`;
       }
-      return `R$ ${price}`;
     }
-  } catch {
-    // ignore
-  }
+  } catch { /* */ }
   return "";
 }
 
-function extractImageFromJsonLd(jsonLd: Record<string, any>): string {
+function extractImagesFromJsonLd(jsonLd: Record<string, any>): string[] {
   try {
     const img = jsonLd.image;
-    if (typeof img === "string") return img;
-    if (Array.isArray(img)) return img[0] || "";
-    if (img?.url) return img.url;
-    if (img?.contentUrl) return img.contentUrl;
-  } catch {
-    // ignore
+    if (typeof img === "string") return [img];
+    if (Array.isArray(img)) {
+      return img.map((i: any) => typeof i === "string" ? i : i?.url || i?.contentUrl || "").filter(Boolean);
+    }
+    if (img?.url) return [img.url];
+    if (img?.contentUrl) return [img.contentUrl];
+  } catch { /* */ }
+  return [];
+}
+
+function findProductImages(doc: any, html: string): string[] {
+  const images: string[] = [];
+  
+  // Try data-src and src attributes from img tags
+  const imgTags = doc?.querySelectorAll("img") || [];
+  for (const img of imgTags) {
+    const src = (img as any).getAttribute("data-src") || 
+                (img as any).getAttribute("data-zoom-image") ||
+                (img as any).getAttribute("data-large-image") ||
+                (img as any).getAttribute("src") || "";
+    if (src && isValidImageUrl(src)) {
+      const fullUrl = src.startsWith("//") ? `https:${src}` : src;
+      if (fullUrl.startsWith("http") && (
+        fullUrl.includes(".jpg") || fullUrl.includes(".jpeg") || 
+        fullUrl.includes(".png") || fullUrl.includes(".webp") ||
+        fullUrl.includes("images") || fullUrl.includes("img") ||
+        fullUrl.includes("produto") || fullUrl.includes("product")
+      )) {
+        images.push(fullUrl);
+      }
+    }
   }
-  return "";
+
+  // Try to find images in data attributes or JSON embedded in page
+  const imgPatterns = [
+    /"original"\s*:\s*"(https?:\/\/[^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/gi,
+    /"zoom(?:Image|Url)?"\s*:\s*"(https?:\/\/[^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/gi,
+    /"(?:large|big|full)(?:Image|Url)?"\s*:\s*"(https?:\/\/[^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/gi,
+    /"imageUrl"\s*:\s*"(https?:\/\/[^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/gi,
+  ];
+  for (const pattern of imgPatterns) {
+    let match;
+    while ((match = pattern.exec(html)) !== null) {
+      if (isValidImageUrl(match[1])) {
+        images.push(match[1].replace(/\\u002F/g, "/").replace(/\\/g, ""));
+      }
+    }
+  }
+
+  return [...new Set(images)];
 }
 
 Deno.serve(async (req) => {
@@ -74,10 +132,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Try multiple User-Agent strategies
     const userAgents = [
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
       "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
     ];
 
     let html = "";
@@ -92,24 +149,22 @@ Deno.serve(async (req) => {
             "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
             "Accept-Encoding": "identity",
             "Cache-Control": "no-cache",
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "none",
           },
           redirect: "follow",
         });
-        html = await res.text();
+        const text = await res.text();
         finalUrl = res.url || url;
-        // If we got meaningful content, break
-        if (html.length > 1000) break;
+        // Keep the longest response (more content = better)
+        if (text.length > html.length) {
+          html = text;
+        }
+        if (html.length > 5000) break;
       } catch {
         continue;
       }
     }
 
     const doc = new DOMParser().parseFromString(html, "text/html");
-
-    // 1. Try JSON-LD first (most reliable for e-commerce)
     const jsonLd = extractJsonLd(html);
 
     const getMeta = (name: string) =>
@@ -117,72 +172,58 @@ Deno.serve(async (req) => {
       doc?.querySelector(`meta[name='${name}']`)?.getAttribute("content") ||
       "";
 
-    // Title: JSON-LD > og:title > twitter:title > <title> > h1
-    const title =
+    // Title
+    let title =
       jsonLd?.name ||
       getMeta("og:title") ||
       getMeta("twitter:title") ||
       doc?.querySelector("title")?.textContent?.trim() ||
       doc?.querySelector("h1")?.textContent?.trim() ||
-      "Produto";
-
-    // Image: JSON-LD > og:image > twitter:image > first large img
-    let image =
-      (jsonLd ? extractImageFromJsonLd(jsonLd) : "") ||
-      getMeta("og:image") ||
-      getMeta("twitter:image") ||
       "";
+    // Clean up title
+    title = title.replace(/\s*\|.*$/, "").replace(/\s*-\s*(Amazon|Shopee|Mercado|Magazine).*$/i, "").trim() || "Produto";
 
-    // If no image from meta, try to find product images in HTML
-    if (!image) {
-      const imgTags = doc?.querySelectorAll("img[src]") || [];
-      for (const img of imgTags) {
-        const src = (img as any).getAttribute("src") || "";
-        const alt = (img as any).getAttribute("alt") || "";
-        // Skip tiny images, icons, logos
-        if (src && !src.includes("logo") && !src.includes("icon") && !src.includes("sprite") && 
-            (src.includes("http") || src.startsWith("//"))) {
-          image = src.startsWith("//") ? `https:${src}` : src;
-          break;
-        }
-      }
-    }
+    // Image - prioritize JSON-LD, then meta, then page scanning
+    let image = "";
+    const jsonLdImages = jsonLd ? extractImagesFromJsonLd(jsonLd) : [];
+    const validJsonLdImages = jsonLdImages.filter(isValidImageUrl);
+    
+    const ogImage = getMeta("og:image");
+    const twitterImage = getMeta("twitter:image");
+    
+    const candidates = [
+      ...validJsonLdImages,
+      ...(ogImage && isValidImageUrl(ogImage) ? [ogImage] : []),
+      ...(twitterImage && isValidImageUrl(twitterImage) ? [twitterImage] : []),
+      ...findProductImages(doc, html),
+    ];
+    
+    image = candidates[0] || "";
 
     // Description
     const description =
       jsonLd?.description ||
       getMeta("og:description") ||
       getMeta("description") ||
-      getMeta("twitter:description") ||
       "";
 
-    // Price: JSON-LD > regex patterns
+    // Price
     let price = jsonLd ? extractPriceFromJsonLd(jsonLd) : "";
     if (!price) {
-      // Multiple price patterns
       const pricePatterns = [
         /R\$\s*[\d]+[.,][\d]{2}/,
         /R\$\s*[\d.,]+/,
-        /"price"\s*:\s*"?([\d.,]+)"?/,
-        /"lowPrice"\s*:\s*"?([\d.,]+)"?/,
       ];
       for (const pattern of pricePatterns) {
         const match = html.match(pattern);
         if (match) {
           price = match[0].trim();
-          // If captured a JSON value, format it
-          if (!price.startsWith("R$")) {
-            const num = parseFloat(price.replace(",", "."));
-            if (!isNaN(num)) {
-              price = `R$ ${num.toFixed(2).replace(".", ",")}`;
-            }
-          }
           break;
         }
       }
     }
 
-    console.log("Scraped result:", { title: title.substring(0, 50), hasImage: !!image, price, hasJsonLd: !!jsonLd });
+    console.log("Scraped:", { title: title.substring(0, 60), hasImage: !!image, price, hasJsonLd: !!jsonLd, candidates: candidates.length });
 
     return new Response(
       JSON.stringify({ title, image, description, price, url: finalUrl }),
