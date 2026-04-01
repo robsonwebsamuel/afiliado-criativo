@@ -24,7 +24,6 @@ const CAPTION_STYLES = [
 ];
 
 const CreateArt = () => {
-  const previewRef = useRef<HTMLDivElement>(null);
   const { product, loading: scraping, fetchProduct } = useProductScraper();
   const [link, setLink] = useState('');
   const [currentStep, setCurrentStep] = useState<Step>('link');
