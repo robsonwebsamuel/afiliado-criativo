@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { ProtectedRoute, AdminRoute } from "@/components/ProtectedRoute";
 import Dashboard from "./pages/Dashboard";
 import CreateArt from "./pages/CreateArt";
 import Templates from "./pages/Templates";
