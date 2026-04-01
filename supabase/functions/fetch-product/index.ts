@@ -29,7 +29,15 @@ function isValidImageUrl(url: string): boolean {
     "fls-na.amazon", "fls-eu.amazon",
     "images-na.ssl-images-amazon.com/images/G/01/x-locale",
     "data:image", "svg+xml",
+    // ML non-product images
+    "mercadolibre.com/org-img", "mercadolivre.com/org-img",
+    "meli-incubator", "frontend-assets",
+    "/nav-header", "/favicon",
+    // ML handshake/logo
+    "/logo", "mercadopago", "logo-mercadolibre",
   ];
+  // Extra check: reject very small images from mlstatic that are logos
+  if (url.includes("mlstatic") && (url.includes("/resources/") || url.includes("/org-img/"))) return false;
   return !blacklist.some(b => url.toLowerCase().includes(b));
 }
 
@@ -194,70 +202,127 @@ function isMercadoLivre(url: string): boolean {
 async function fetchMeliApi(url: string): Promise<{ title?: string; price?: string; image?: string }> {
   // Try extracting ML item ID from various URL formats
   const patterns = [
+    /\/(ML[AB]-?\d+)/i,
     /ML[AB]-?\d+/i,
-    /\/p\/(ML[AB]\d+)/i,
-    /\/(ML[AB]-\d+)/i,
   ];
   
   let itemId = "";
   for (const p of patterns) {
     const m = url.match(p);
     if (m) {
-      itemId = m[1] || m[0];
+      itemId = (m[1] || m[0]).replace("-", "").toUpperCase();
       break;
     }
   }
-  
-  if (!itemId) {
-    // Try to extract from URL path like /product-name/p/MLB12345
-    const pathMatch = url.match(/\/p\/([A-Z]{3}\d+)/i);
-    if (pathMatch) itemId = pathMatch[1];
-  }
-  
-  if (!itemId) {
-    console.log("ML API: no item ID found in URL:", url);
-    return {};
+
+  // For catalog URLs like /p/MLB27391145, the ID is a catalog_product_id
+  const catalogMatch = url.match(/\/p\/(ML[AB]\d+)/i);
+  const catalogId = catalogMatch ? catalogMatch[1].toUpperCase() : "";
+
+  // Try catalog search first (for /p/ URLs)
+  if (catalogId) {
+    console.log("ML API: trying catalog search for", catalogId);
+    try {
+      const searchRes = await fetch(
+        `https://api.mercadolibre.com/sites/MLB/search?catalog_product_id=${catalogId}&limit=1`,
+        { headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" } }
+      );
+      console.log("ML catalog search status:", searchRes.status);
+      if (searchRes.ok) {
+        const searchData = await searchRes.json();
+        console.log("ML catalog search results count:", searchData.results?.length);
+        const firstResult = searchData.results?.[0];
+        if (firstResult) {
+          const result: { title?: string; price?: string; image?: string } = {};
+          result.title = firstResult.title;
+          if (firstResult.price) {
+            result.price = `R$ ${parseFloat(firstResult.price).toFixed(2).replace(".", ",")}`;
+          }
+          if (firstResult.thumbnail) {
+            result.image = firstResult.thumbnail
+              .replace(/-[A-Z]\.jpg/, "-O.jpg")
+              .replace("http://", "https://");
+          }
+          console.log("ML catalog search result:", { title: result.title?.substring(0, 50), price: result.price, hasImage: !!result.image });
+          if (result.title && result.price) return result;
+        }
+      } else {
+        const errText = await searchRes.text();
+        console.log("ML catalog search error:", errText.substring(0, 200));
+      }
+    } catch (e) {
+      console.log("ML catalog search failed:", e);
+    }
   }
 
-  itemId = itemId.replace("-", "").toUpperCase();
-  console.log("ML API: fetching item", itemId);
-  
-  try {
-    const res = await fetch(`https://api.mercadolibre.com/items/${itemId}`, {
-      headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" },
-    });
-    console.log("ML API response status:", res.status);
-    if (!res.ok) {
-      const text = await res.text();
-      console.log("ML API error body:", text.substring(0, 200));
-      return {};
-    }
-    const data = await res.json();
-    const result: { title?: string; price?: string; image?: string } = {};
-    if (data.title) result.title = data.title;
-    if (data.price) result.price = `R$ ${parseFloat(data.price).toFixed(2).replace(".", ",")}`;
-    
-    // Get best image: pictures > thumbnail
-    if (data.pictures?.length > 0) {
-      // Get the largest variant
-      const pic = data.pictures[0];
-      result.image = pic.secure_url || pic.url || "";
-      // Try to get max size by replacing size suffix
-      if (result.image) {
-        result.image = result.image.replace(/-[A-Z]\.jpg/, "-O.jpg");
+  // Try search by product name from URL slug
+  const urlTitle = extractTitleFromUrl(url);
+  if (urlTitle && urlTitle.length > 5) {
+    console.log("ML API: trying search by name:", urlTitle);
+    try {
+      const searchRes = await fetch(
+        `https://api.mercadolibre.com/sites/MLB/search?q=${encodeURIComponent(urlTitle)}&limit=1`,
+        { headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" } }
+      );
+      if (searchRes.ok) {
+        const searchData = await searchRes.json();
+        const firstResult = searchData.results?.[0];
+        if (firstResult) {
+          const result: { title?: string; price?: string; image?: string } = {};
+          result.title = firstResult.title;
+          if (firstResult.price) {
+            result.price = `R$ ${parseFloat(firstResult.price).toFixed(2).replace(".", ",")}`;
+          }
+          if (firstResult.thumbnail) {
+            result.image = firstResult.thumbnail
+              .replace(/-[A-Z]\.jpg/, "-O.jpg")
+              .replace("http://", "https://");
+          }
+          console.log("ML name search result:", { title: result.title?.substring(0, 50), price: result.price, hasImage: !!result.image });
+          if (result.title && result.price && result.image) return result;
+        }
       }
-    } else if (data.secure_thumbnail) {
-      result.image = data.secure_thumbnail.replace(/-[A-Z]\.jpg/, "-O.jpg");
-    } else if (data.thumbnail) {
-      result.image = data.thumbnail.replace(/-[A-Z]\.jpg/, "-O.jpg").replace("http://", "https://");
+    } catch (e) {
+      console.log("ML name search failed:", e);
     }
-    
-    console.log("ML API result:", { title: result.title?.substring(0, 50), price: result.price, hasImage: !!result.image });
-    return result;
-  } catch (e) {
-    console.error("ML API fetch error:", e);
-    return {};
   }
+  
+  // Fallback: direct item API
+  if (itemId) {
+    console.log("ML API: fetching item", itemId);
+    try {
+      const res = await fetch(`https://api.mercadolibre.com/items/${itemId}`, {
+        headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" },
+      });
+      console.log("ML API response status:", res.status);
+      if (!res.ok) {
+        const text = await res.text();
+        console.log("ML API error body:", text.substring(0, 200));
+        return {};
+      }
+      const data = await res.json();
+      const result: { title?: string; price?: string; image?: string } = {};
+      if (data.title) result.title = data.title;
+      if (data.price) result.price = `R$ ${parseFloat(data.price).toFixed(2).replace(".", ",")}`;
+      
+      if (data.pictures?.length > 0) {
+        const pic = data.pictures[0];
+        result.image = pic.secure_url || pic.url || "";
+        if (result.image) result.image = result.image.replace(/-[A-Z]\.jpg/, "-O.jpg");
+      } else if (data.secure_thumbnail) {
+        result.image = data.secure_thumbnail.replace(/-[A-Z]\.jpg/, "-O.jpg");
+      } else if (data.thumbnail) {
+        result.image = data.thumbnail.replace(/-[A-Z]\.jpg/, "-O.jpg").replace("http://", "https://");
+      }
+      
+      console.log("ML API result:", { title: result.title?.substring(0, 50), price: result.price, hasImage: !!result.image });
+      return result;
+    } catch (e) {
+      console.error("ML API fetch error:", e);
+    }
+  }
+
+  return {};
 }
 
 function extractMeliFromHtml(html: string): { title?: string; price?: string; image?: string } {
@@ -266,8 +331,10 @@ function extractMeliFromHtml(html: string): { title?: string; price?: string; im
   // Title patterns
   const titlePatterns = [
     /class="ui-pdp-title"[^>]*>([^<]+)/,
+    /class="ui-pdp-title"[^>]*>([^<]+)/,
     /data-testid="pdp-title"[^>]*>([^<]+)/,
     /"title"\s*:\s*"([^"]{10,200})"/,
+    /"product_title"\s*:\s*"([^"]{10,200})"/,
   ];
   for (const p of titlePatterns) {
     const m = html.match(p);
@@ -277,33 +344,47 @@ function extractMeliFromHtml(html: string): { title?: string; price?: string; im
     }
   }
 
-  // Price patterns
+  // Price patterns - more aggressive
   const pricePatterns = [
     /itemprop="price"\s+content="([\d.]+)"/,
+    /property="product:price:amount"\s+content="([\d.]+)"/,
     /class="andes-money-amount__fraction"[^>]*>([\d.]+)/,
-    /"price"\s*:\s*([\d.]+)/,
-    /"amount"\s*:\s*([\d.]+)/,
+    /"price"\s*:\s*([\d]+(?:\.\d+)?)\s*[,}]/,
+    /"amount"\s*:\s*([\d]+(?:\.\d+)?)\s*[,}]/,
+    /"sale_price"\s*:\s*([\d]+(?:\.\d+)?)/,
+    /R\$\s*([\d]{1,3}(?:\.?\d{3})*(?:,\d{2})?)/,
   ];
   for (const p of pricePatterns) {
     const m = html.match(p);
     if (m && m[1]) {
-      const num = parseFloat(m[1]);
-      if (!isNaN(num) && num > 1) {
+      let raw = m[1];
+      let num: number;
+      if (raw.includes(",") && raw.includes(".")) {
+        num = parseFloat(raw.replace(/\./g, "").replace(",", "."));
+      } else if (raw.includes(",")) {
+        num = parseFloat(raw.replace(",", "."));
+      } else {
+        num = parseFloat(raw);
+      }
+      if (!isNaN(num) && num > 1 && num < 1_000_000) {
         result.price = `R$ ${num.toFixed(2).replace(".", ",")}`;
         break;
       }
     }
   }
 
-  // Image from ML CDN
+  // Image from ML CDN - look for product images specifically
   const imgPatterns = [
-    /"(https?:\/\/http2\.mlstatic\.com\/D_[^"]+)"/,
+    // D_ prefix is the product image pattern on mlstatic
+    /"(https?:\/\/http2\.mlstatic\.com\/D_[^"]+\.(?:jpg|jpeg|webp|png)[^"]*)"/,
+    /"(https?:\/\/[^"]*mlstatic\.com\/D_[^"]+)"/,
+    // og:image from meta tags (most reliable for ML)
+    /property="og:image"\s+content="(https?:\/\/[^"]+)"/,
     /content="(https?:\/\/[^"]+mlstatic\.com[^"]+\.(?:jpg|jpeg|webp|png)[^"]*)"/,
-    /"src"\s*:\s*"(https?:\/\/[^"]+mlstatic[^"]+\.(?:jpg|jpeg|webp|png)[^"]*)"/,
   ];
   for (const p of imgPatterns) {
     const m = html.match(p);
-    if (m && m[1]) {
+    if (m && m[1] && isValidImageUrl(m[1])) {
       result.image = m[1].replace(/-[A-Z]\.jpg/, "-O.jpg");
       break;
     }
@@ -513,10 +594,18 @@ Deno.serve(async (req) => {
 
       // Fallback to HTML scrape
       const { html, finalUrl } = await fetchHtml(url);
+      console.log("ML HTML length:", html.length);
+      
       const meliHtml = extractMeliFromHtml(html);
+      console.log("ML HTML extraction:", { title: meliHtml.title?.substring(0, 40), price: meliHtml.price, hasImage: !!meliHtml.image });
+      
       const doc = new DOMParser().parseFromString(html, "text/html");
       const jsonLd = extractJsonLd(html);
       const urlTitle = extractTitleFromUrl(url);
+      
+      // Also try og:image directly from meta
+      const ogImage = doc?.querySelector("meta[property='og:image']")?.getAttribute("content") || "";
+      console.log("ML og:image:", ogImage?.substring(0, 80));
 
       const title = cleanTitle(
         apiData.title || meliHtml.title || jsonLd?.name ||
@@ -530,10 +619,11 @@ Deno.serve(async (req) => {
         extractPriceFromHtml(html);
 
       const image = apiData.image || meliHtml.image ||
+        (ogImage && isValidImageUrl(ogImage) ? ogImage : "") ||
         (jsonLd ? extractImagesFromJsonLd(jsonLd).filter(isValidImageUrl)[0] : "") ||
         findProductImages(doc, html)[0] || "";
 
-      console.log("ML result:", { title: title.substring(0, 50), price, hasImage: !!image });
+      console.log("ML result:", { title: title.substring(0, 50), price, hasImage: !!image, imageUrl: image?.substring(0, 60) });
       return new Response(
         JSON.stringify({ title, image, description: "", price, url: finalUrl }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
