@@ -194,70 +194,91 @@ function isMercadoLivre(url: string): boolean {
 async function fetchMeliApi(url: string): Promise<{ title?: string; price?: string; image?: string }> {
   // Try extracting ML item ID from various URL formats
   const patterns = [
+    /\/(ML[AB]-?\d+)/i,
     /ML[AB]-?\d+/i,
-    /\/p\/(ML[AB]\d+)/i,
-    /\/(ML[AB]-\d+)/i,
   ];
   
   let itemId = "";
   for (const p of patterns) {
     const m = url.match(p);
     if (m) {
-      itemId = m[1] || m[0];
+      itemId = (m[1] || m[0]).replace("-", "").toUpperCase();
       break;
     }
   }
-  
-  if (!itemId) {
-    // Try to extract from URL path like /product-name/p/MLB12345
-    const pathMatch = url.match(/\/p\/([A-Z]{3}\d+)/i);
-    if (pathMatch) itemId = pathMatch[1];
+
+  // For catalog URLs like /p/MLB27391145, the ID is a catalog_product_id
+  const catalogMatch = url.match(/\/p\/(ML[AB]\d+)/i);
+  const catalogId = catalogMatch ? catalogMatch[1].toUpperCase() : "";
+
+  // Try catalog search first (for /p/ URLs)
+  if (catalogId) {
+    console.log("ML API: trying catalog search for", catalogId);
+    try {
+      // Search for items in this catalog
+      const searchRes = await fetch(
+        `https://api.mercadolibre.com/sites/MLB/search?catalog_product_id=${catalogId}&limit=1`,
+        { headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" } }
+      );
+      if (searchRes.ok) {
+        const searchData = await searchRes.json();
+        const firstResult = searchData.results?.[0];
+        if (firstResult) {
+          const result: { title?: string; price?: string; image?: string } = {};
+          result.title = firstResult.title;
+          if (firstResult.price) {
+            result.price = `R$ ${parseFloat(firstResult.price).toFixed(2).replace(".", ",")}`;
+          }
+          if (firstResult.thumbnail) {
+            result.image = firstResult.thumbnail
+              .replace(/-[A-Z]\.jpg/, "-O.jpg")
+              .replace("http://", "https://");
+          }
+          console.log("ML catalog search result:", { title: result.title?.substring(0, 50), price: result.price, hasImage: !!result.image });
+          if (result.title && result.price) return result;
+        }
+      }
+    } catch (e) {
+      console.log("ML catalog search failed:", e);
+    }
   }
   
-  if (!itemId) {
-    console.log("ML API: no item ID found in URL:", url);
-    return {};
+  // Fallback: direct item API
+  if (itemId) {
+    console.log("ML API: fetching item", itemId);
+    try {
+      const res = await fetch(`https://api.mercadolibre.com/items/${itemId}`, {
+        headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" },
+      });
+      console.log("ML API response status:", res.status);
+      if (!res.ok) {
+        const text = await res.text();
+        console.log("ML API error body:", text.substring(0, 200));
+        return {};
+      }
+      const data = await res.json();
+      const result: { title?: string; price?: string; image?: string } = {};
+      if (data.title) result.title = data.title;
+      if (data.price) result.price = `R$ ${parseFloat(data.price).toFixed(2).replace(".", ",")}`;
+      
+      if (data.pictures?.length > 0) {
+        const pic = data.pictures[0];
+        result.image = pic.secure_url || pic.url || "";
+        if (result.image) result.image = result.image.replace(/-[A-Z]\.jpg/, "-O.jpg");
+      } else if (data.secure_thumbnail) {
+        result.image = data.secure_thumbnail.replace(/-[A-Z]\.jpg/, "-O.jpg");
+      } else if (data.thumbnail) {
+        result.image = data.thumbnail.replace(/-[A-Z]\.jpg/, "-O.jpg").replace("http://", "https://");
+      }
+      
+      console.log("ML API result:", { title: result.title?.substring(0, 50), price: result.price, hasImage: !!result.image });
+      return result;
+    } catch (e) {
+      console.error("ML API fetch error:", e);
+    }
   }
 
-  itemId = itemId.replace("-", "").toUpperCase();
-  console.log("ML API: fetching item", itemId);
-  
-  try {
-    const res = await fetch(`https://api.mercadolibre.com/items/${itemId}`, {
-      headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0" },
-    });
-    console.log("ML API response status:", res.status);
-    if (!res.ok) {
-      const text = await res.text();
-      console.log("ML API error body:", text.substring(0, 200));
-      return {};
-    }
-    const data = await res.json();
-    const result: { title?: string; price?: string; image?: string } = {};
-    if (data.title) result.title = data.title;
-    if (data.price) result.price = `R$ ${parseFloat(data.price).toFixed(2).replace(".", ",")}`;
-    
-    // Get best image: pictures > thumbnail
-    if (data.pictures?.length > 0) {
-      // Get the largest variant
-      const pic = data.pictures[0];
-      result.image = pic.secure_url || pic.url || "";
-      // Try to get max size by replacing size suffix
-      if (result.image) {
-        result.image = result.image.replace(/-[A-Z]\.jpg/, "-O.jpg");
-      }
-    } else if (data.secure_thumbnail) {
-      result.image = data.secure_thumbnail.replace(/-[A-Z]\.jpg/, "-O.jpg");
-    } else if (data.thumbnail) {
-      result.image = data.thumbnail.replace(/-[A-Z]\.jpg/, "-O.jpg").replace("http://", "https://");
-    }
-    
-    console.log("ML API result:", { title: result.title?.substring(0, 50), price: result.price, hasImage: !!result.image });
-    return result;
-  } catch (e) {
-    console.error("ML API fetch error:", e);
-    return {};
-  }
+  return {};
 }
 
 function extractMeliFromHtml(html: string): { title?: string; price?: string; image?: string } {
