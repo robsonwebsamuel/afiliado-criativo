@@ -6,6 +6,32 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&#x2F;/g, "/")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&NegativeMediumSpace;/g, "")
+    .replace(/&NegativeThickSpace;/g, "")
+    .replace(/&NegativeThinSpace;/g, "")
+    .replace(/&NegativeVeryThinSpace;/g, "")
+    .replace(/&ZeroWidthSpace;/g, "")
+    .replace(/&thinsp;/g, " ")
+    .replace(/&ensp;/g, " ")
+    .replace(/&emsp;/g, " ")
+    .replace(/&#\d+;/g, (m) => String.fromCharCode(parseInt(m.slice(2, -1))))
+    .replace(/&#x[0-9a-fA-F]+;/g, (m) => String.fromCharCode(parseInt(m.slice(3, -1), 16)))
+    .replace(/&[a-zA-Z]+;/g, "") // Remove any remaining named entities
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 function isValidImageUrl(url: string): boolean {
   if (!url) return false;
   // Filter out tracking pixels, 1x1 images, analytics URLs
