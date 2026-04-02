@@ -460,7 +460,7 @@ const CreateArt = () => {
               {/* Rodapé – 30% */}
               <div className="absolute left-[5%] right-[5%] bottom-0 h-[30%] flex flex-col items-center justify-center gap-3 z-10">
                 <h3 className="text-base font-montserrat font-normal text-white text-center leading-tight line-clamp-3 drop-shadow-lg px-2">
-                  {product?.name || 'Seu Produto'}
+                  {product?.name || 'Nome do produto'}
                 </h3>
                 <div className="bg-white rounded-full px-6 py-2 shadow-lg">
                   <span className="text-2xl font-montserrat font-bold text-gray-900">R$ {formatPrice(product?.price ?? "") || '--,--'}</span>
