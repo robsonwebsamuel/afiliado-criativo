@@ -264,7 +264,7 @@ async function scrapeMercadoLivre(url: string) {
   // Fallback: extract name from URL slug if title is generic
   const genericNames = ["nome do produto", "mercado livre", "mercadolivre", ""];
   if (!name || genericNames.includes(name.toLowerCase().trim())) {
-    const slugMatch = url.match(/mercadolivre\.com\.br\/[^\/]+\/([^\/\?#]+)/);
+    const slugMatch = url.match(/mercadolivre\.com\.br\/([a-z0-9][a-z0-9\-]+[a-z0-9])/i);
     if (slugMatch) {
       name = decodeURIComponent(slugMatch[1])
         .replace(/-/g, " ")
