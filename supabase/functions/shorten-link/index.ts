@@ -22,25 +22,29 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabase = createClient(
+    // Try to get user from auth header, fallback to anonymous
+    const supabaseAuth = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Não autenticado" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    let userId: string | null = null;
+    try {
+      const { data: { user } } = await supabaseAuth.auth.getUser();
+      userId = user?.id || null;
+    } catch {}
+
+    // Use service role to insert (bypasses RLS)
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
 
     const slug = Math.random().toString(36).substring(2, 8);
     const { data, error } = await supabase
       .from("short_links")
-      .insert({ slug, original_url: url, clicks: 0, user_id: user.id })
+      .insert({ slug, original_url: url, clicks: 0, user_id: userId || "00000000-0000-0000-0000-000000000000" })
       .select()
       .single();
 
