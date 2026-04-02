@@ -47,18 +47,30 @@ Deno.serve(async (req) => {
 
 // ─── Router ──────────────────────────────────────────────────────────────────
 async function extractProduct(url: string) {
-  const hostname = new URL(url).hostname.toLowerCase();
+  let processedUrl = url;
+  
+  // Handle Shopee short links
+  if (url.includes("shope.ee/")) {
+    try {
+      const res = await fetch(url, { redirect: "follow", method: "HEAD" });
+      processedUrl = res.url;
+    } catch { /* ignore */ }
+  }
+
+  const hostname = new URL(processedUrl).hostname.toLowerCase();
   try {
-    if (hostname.includes("shopee.com.br")) return await scrapeShopee(url);
-    if (hostname.includes("amazon.com.br")) return await scrapeAmazon(url);
+    if (hostname.includes("shopee.com.br")) return await scrapeShopee(processedUrl);
+    if (hostname.includes("amazon.com.br")) return await scrapeAmazon(processedUrl);
     if (hostname.includes("mercadolivre") || hostname.includes("mercadopago") || hostname.includes("produto.mercadolivre"))
-      return await scrapeMercadoLivre(url);
-    if (hostname.includes("hotmart.com")) return await scrapeGeneric(url, "hotmart");
-    if (hostname.includes("kiwify.com.br")) return await scrapeGeneric(url, "kiwify");
-    return await scrapeGeneric(url, hostname);
+      return await scrapeMercadoLivre(processedUrl);
+    if (hostname.includes("magazineluiza.com.br") || hostname.includes("magalu.com"))
+      return await scrapeMagalu(processedUrl);
+    if (hostname.includes("hotmart.com")) return await scrapeGeneric(processedUrl, "hotmart");
+    if (hostname.includes("kiwify.com.br")) return await scrapeGeneric(processedUrl, "kiwify");
+    return await scrapeGeneric(processedUrl, hostname);
   } catch (e: any) {
     console.error(`Scrape error for ${hostname}:`, e.message);
-    return await scrapeGeneric(url, hostname);
+    return await scrapeGeneric(processedUrl, hostname);
   }
 }
 
@@ -155,8 +167,13 @@ async function scrapeShopee(url: string) {
   let shopId: string | null = null;
   let itemId: string | null = null;
 
+  // Pattern: i.SHOPID.ITEMID
   const matchI = url.match(/i\.(\d+)\.(\d+)/);
   if (matchI) { shopId = matchI[1]; itemId = matchI[2]; }
+
+  // Pattern: /product/SHOPID/ITEMID
+  const matchP = url.match(/\/product\/(\d+)\/(\d+)/);
+  if (matchP && !shopId) { shopId = matchP[1]; itemId = matchP[2]; }
 
   const urlObj = new URL(url);
   if (!shopId) shopId = urlObj.searchParams.get("shopid");
@@ -166,19 +183,59 @@ async function scrapeShopee(url: string) {
 
   const apiUrl = `https://shopee.com.br/api/v4/item/get?itemid=${itemId}&shopid=${shopId}`;
   const res = await fetch(apiUrl, {
-    headers: { "User-Agent": randomUA(), Referer: "https://shopee.com.br/", Accept: "application/json" },
+    headers: { 
+      "User-Agent": randomUA(), 
+      "Referer": "https://shopee.com.br/", 
+      "Accept": "application/json",
+      "X-Shopee-Language": "pt-BR",
+    },
   });
+  
   const json = await res.json();
   const item = json?.data;
   if (!item) throw new Error("Shopee API sem dados");
 
   return {
     name: item.name ?? "Nome do produto",
-    price: item.price ? (item.price / 100000).toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : null,
+    price: item.price ? (item.price / 100000).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : null,
     image: item.image ? `https://down-br.img.susercontent.com/file/${item.image}` : null,
     description: item.description?.substring(0, 400) ?? null,
     url,
     source: "shopee",
+  };
+}
+
+// ─── MAGAZINE LUIZA ──────────────────────────────────────────────────────────
+async function scrapeMagalu(url: string) {
+  const html = await fetchHtml(url);
+  const jsonLd = extractJsonLd(html);
+  const jProduct = findProductInJsonLd(jsonLd);
+
+  const name =
+    jProduct?.name ||
+    metaContent(html, "og:title") ||
+    html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)?.[1]?.trim() ||
+    extractTitle(html);
+
+  const price = 
+    (jProduct ? extractPriceFromJsonLd(jProduct) : null) ||
+    (() => {
+      const m = html.match(/data-testid="price-value"[^>]*>R\$\s*([\d.,]+)/i);
+      return m ? m[1] : extractPrice(html);
+    })();
+
+  const image = 
+    (typeof jProduct?.image === "string" ? jProduct.image : Array.isArray(jProduct?.image) ? jProduct.image[0] : null) ||
+    metaContent(html, "og:image") ||
+    html.match(/<img[^>]*data-testid="image-selected"[^>]*src="([^"]+)"/i)?.[1];
+
+  return {
+    name: decodeHtmlEntities(name || "Nome do produto").replace(/\s*-\s*Magazine Luiza.*/i, "").trim().substring(0, 200),
+    price,
+    image,
+    description: metaContent(html, "og:description")?.substring(0, 400) ?? null,
+    url,
+    source: "magazineluiza",
   };
 }
 
