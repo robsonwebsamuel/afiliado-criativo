@@ -18,17 +18,7 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
 });
 
-export const useAuth = () => {
-  // Mock temporário para desenvolvimento — remover antes do deploy
-  return {
-    user: { id: "dev-user", email: "dev@admin.com", role: "admin" } as any,
-    session: { access_token: "dev-token" } as any,
-    loading: false,
-    isAdmin: true,
-    isAuthenticated: true,
-    signOut: async () => { console.log("Sign out mocked"); },
-  };
-};
+export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -76,15 +66,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   };
 
-  // TODO: reativar autenticação real antes do deploy
   return (
-    <AuthContext.Provider value={{ 
-      user: { id: "dev-user", email: "dev@admin.com", role: "admin" } as any, 
-      session: { access_token: "dev-token" } as any, 
-      loading: false, 
-      isAdmin: true, 
-      signOut: async () => {} 
-    }}>
+    <AuthContext.Provider value={{ user, session, loading, isAdmin, signOut }}>
       {children}
     </AuthContext.Provider>
   );
