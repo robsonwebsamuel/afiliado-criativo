@@ -3,10 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export interface ProductData {
-  title: string;
-  image: string;
-  description: string;
-  price: string;
+  name: string;
+  image: string | null;
+  description: string | null;
+  price: string | null;
   url: string;
   shortUrl?: string;
 }
@@ -14,17 +14,25 @@ export interface ProductData {
 export function useProductScraper() {
   const [loading, setLoading] = useState(false);
   const [product, setProduct] = useState<ProductData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
 
   async function fetchProduct(url: string) {
     if (!url) return;
     setLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("fetch-product", {
-        body: { url },
-      });
-      if (error) throw error;
+    setError(null);
+    setWarning(null);
 
-      // Shorten link
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke(
+        "scrape-product",
+        { body: { url } }
+      );
+
+      if (fnError) throw fnError;
+      if (data?.error) throw new Error(data.error);
+
+      // Shorten link (preserved from previous version)
       let shortUrl = url;
       try {
         const { data: shortData } = await supabase.functions.invoke("shorten-link", {
@@ -38,40 +46,55 @@ export function useProductScraper() {
       }
 
       const productData: ProductData = {
-        title: data.title || "Produto",
-        image: data.image || "",
-        description: data.description || "",
-        price: data.price || "",
+        name: data.name || "Produto sem nome",
+        image: data.image || null,
+        description: data.description || null,
+        price: data.price || null,
         url: data.url || url,
         shortUrl,
       };
 
+      // Valida campos obrigatórios
+      const missing: string[] = [];
+      if (!productData.name || productData.name === "Produto sem nome") missing.push("nome");
+      if (!productData.price) missing.push("preço");
+      if (!productData.image) missing.push("imagem");
+
       setProduct(productData);
-      
-      if (!data.image) {
-        toast.warning("Dados carregados, mas não conseguimos encontrar a imagem. Você pode inserir o link da imagem manualmente.");
+
+      // Avisa o usuário sobre campos que não foram encontrados
+      if (missing.length > 0) {
+        setWarning(
+          `Não foi possível buscar automaticamente: ${missing.join(", ")}. ` +
+          `Por favor, preencha manualmente.`
+        );
       } else {
+        setWarning(null);
         toast.success("Produto carregado com sucesso!");
       }
-      
+
       return productData;
-    } catch (e) {
+    } catch (e: any) {
       console.error("Error fetching product:", e);
-      // Fallback for absolute failure
+      setError(
+        "Não foi possível buscar os dados do produto. " +
+        "Verifique o link ou preencha os dados manualmente."
+      );
+      toast.error("Não foi possível carregar os dados automaticamente.");
+      
       const fallbackData: ProductData = {
-        title: "Produto",
-        image: "",
-        description: "",
-        price: "",
+        name: "Produto",
+        image: null,
+        description: null,
+        price: null,
         url: url,
       };
       setProduct(fallbackData);
-      toast.info("Não foi possível extrair os dados automaticamente. Por favor, preencha os campos manualmente.");
       return fallbackData;
     } finally {
       setLoading(false);
     }
   }
 
-  return { product, loading, fetchProduct, setProduct };
+  return { product, loading, error, warning, fetchProduct, setProduct };
 }

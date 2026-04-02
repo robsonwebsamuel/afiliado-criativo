@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Link2, Sparkles, Copy, RefreshCw, Check, Loader2, ArrowLeft, ArrowRight, ExternalLink } from "lucide-react";
+import { Link2, Sparkles, Copy, RefreshCw, Check, Loader2, ArrowLeft, ArrowRight, ExternalLink, AlertCircle } from "lucide-react";
 import { useProductScraper } from "@/hooks/useProductScraper";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -24,7 +24,7 @@ const CAPTION_STYLES = [
 ];
 
 const CreateArt = () => {
-  const { product, loading: scraping, fetchProduct } = useProductScraper();
+  const { product, loading: scraping, error: scrapeError, warning, fetchProduct, setProduct } = useProductScraper();
   const [link, setLink] = useState('');
   const [currentStep, setCurrentStep] = useState<Step>('link');
   const [format, setFormat] = useState<'feed' | 'stories'>('feed');
@@ -35,17 +35,13 @@ const CreateArt = () => {
   const [copied, setCopied] = useState(false);
   const [lastScrapedLink, setLastScrapedLink] = useState('');
 
-  // Editable fields populated from scraping
-  const [titulo, setTitulo] = useState('');
-  const [valor, setValor] = useState('');
   const [cta, setCta] = useState('Acesse agora e aproveite!');
-  const [manualImageUrl, setManualImageUrl] = useState('');
 
   const stepOrder: Step[] = ['link', 'template', 'caption', 'download'];
   const stepIndex = stepOrder.indexOf(currentStep);
 
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId) || templates[0];
-  const displayImage = manualImageUrl || product?.image || '';
+
 
   async function handleFetchProduct(urlToFetch?: string) {
     const targetUrl = urlToFetch || link.trim();
@@ -60,8 +56,6 @@ const CreateArt = () => {
     const data = await fetchProduct(targetUrl);
     if (data) {
       setLastScrapedLink(targetUrl);
-      setTitulo(data.title);
-      setValor(data.price);
       setCurrentStep('template');
     }
   }
@@ -88,8 +82,8 @@ const CreateArt = () => {
     try {
       const { data, error } = await supabase.functions.invoke("generate-caption", {
         body: {
-          title: titulo || product.title,
-          price: valor || product.price,
+          title: product.name,
+          price: product.price,
           link: product.shortUrl || product.url,
           style: captionStyle,
         },
@@ -131,9 +125,6 @@ const CreateArt = () => {
     setCurrentStep('link');
     setLink('');
     setCaption('');
-    setTitulo('');
-    setValor('');
-    setManualImageUrl('');
     setCopied(false);
   }
 
@@ -215,28 +206,15 @@ const CreateArt = () => {
                     </div>
                   </div>
 
-                  {/* Product info summary */}
-                  {product && (
-                    <Card className="border-primary/20 bg-primary/5">
-                      <CardContent className="p-4 flex gap-4 items-center">
-                        {displayImage && (
-                          <img 
-                            src={displayImage} 
-                            alt={product.title} 
-                            className="w-16 h-16 rounded-lg object-cover" 
-                            referrerPolicy="no-referrer"
-                          />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{product.title}</p>
-                          {product.price && <p className="text-lg font-bold text-primary">{product.price}</p>}
-                          {product.shortUrl && (
-                            <p className="text-xs text-muted-foreground truncate">🔗 {product.shortUrl}</p>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
+                  {/* Alerta de campos faltando */}
+                  {warning && (
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-50 border border-yellow-200 text-yellow-800 text-sm animate-fade-in shadow-sm">
+                      <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                      <span>{warning}</span>
+                    </div>
                   )}
+
+                  {/* Product info summary - Removed old card as we have the editable form now */}
 
                   <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
                     {templates.filter(t => t.format.includes(format)).map((t) => (
@@ -255,21 +233,21 @@ const CreateArt = () => {
                         </div>
                         {/* Center: product image */}
                         <div className="absolute left-[6%] right-[6%] top-[18%] bottom-[30%] bg-white rounded-lg flex items-center justify-center p-1.5 overflow-hidden">
-                          {displayImage ? (
+                          {product?.image ? (
                             <img 
-                              src={displayImage} 
+                              src={product.image} 
                               alt="" 
                               className="w-full h-full object-contain rounded" 
                               referrerPolicy="no-referrer"
                             />
                           ) : (
-                            <div className="w-full h-full bg-muted rounded" />
+                            <div className="w-full h-full bg-muted rounded flex items-center justify-center text-[8px] text-muted-foreground">Sem imagem</div>
                           )}
                         </div>
                         {/* Bottom: title + price */}
                         <div className="absolute left-[6%] right-[6%] bottom-[6%] flex flex-col items-center gap-0.5 z-10">
-                          <p className="text-[6px] font-bold text-white text-center leading-tight line-clamp-2 w-full drop-shadow">{titulo}</p>
-                          <span className="text-[8px] font-black text-white bg-black/30 px-1.5 py-0.5 rounded drop-shadow">{valor}</span>
+                          <p className="text-[6px] font-bold text-white text-center leading-tight line-clamp-2 w-full drop-shadow">{product?.name || '---'}</p>
+                          <span className="text-[8px] font-black text-white bg-black/30 px-1.5 py-0.5 rounded drop-shadow">{product?.price || '---'}</span>
                         </div>
                         <div className="absolute bottom-0.5 left-1 z-10">
                           <span className="text-[7px] font-bold text-white/60">{t.name}</span>
@@ -284,24 +262,74 @@ const CreateArt = () => {
                   </div>
 
                   {/* Editable fields */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-xs text-muted-foreground uppercase">Título</label>
-                      <Input value={titulo} onChange={e => setTitulo(e.target.value)} />
+                  <div className="space-y-4 pt-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Nome */}
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Nome do Produto</label>
+                        <Input 
+                          placeholder="Nome do produto"
+                          value={product?.name ?? ""} 
+                          onChange={e => setProduct(prev => prev ? { ...prev, name: e.target.value } : prev)} 
+                        />
+                      </div>
+                      {/* Preço */}
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Preço</label>
+                        <Input 
+                          placeholder="Ex: 199,90"
+                          value={product?.price ?? ""} 
+                          onChange={e => setProduct(prev => prev ? { ...prev, price: e.target.value } : prev)} 
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-xs text-muted-foreground uppercase">Preço</label>
-                      <Input value={valor} onChange={e => setValor(e.target.value)} />
+
+                    <div className="grid grid-cols-1 md:grid-cols-[128px_1fr] gap-4">
+                      {/* Imagem Preview & URL */}
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Imagem</label>
+                        <div className="aspect-square w-full bg-elevated rounded-lg border border-border/50 flex items-center justify-center overflow-hidden">
+                          {product?.image ? (
+                            <img 
+                              src={product.image} 
+                              alt="Preview" 
+                              className="w-full h-full object-contain"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <div className="text-[10px] text-muted-foreground">Sem imagem</div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="space-y-1 flex flex-col justify-end">
+                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">URL da Imagem</label>
+                        <Input 
+                          placeholder="Cole a URL da imagem manualmente"
+                          value={product?.image ?? ""} 
+                          onChange={e => setProduct(prev => prev ? { ...prev, image: e.target.value } : prev)} 
+                        />
+                        <p className="text-[10px] text-muted-foreground mt-1">Caso a imagem não carregue, tente copiar o endereço de outra imagem do produto.</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground uppercase">URL da Imagem (opcional, caso não carregue)</label>
-                    <Input value={manualImageUrl} onChange={e => setManualImageUrl(e.target.value)} placeholder="https://..." />
                   </div>
 
-                  <div className="pt-4 flex justify-between">
-                    <Button variant="ghost" onClick={handleBack}><ArrowLeft className="w-4 h-4 mr-2" /> Voltar</Button>
-                    <Button onClick={handleNext}>Continuar <ArrowRight className="w-4 h-4 ml-2" /></Button>
+                  <div className="pt-4 flex flex-col gap-3">
+                    <div className="flex gap-2">
+                      <Button variant="outline" className="flex-1" onClick={() => fetchProduct(link)} disabled={scraping}>
+                        {scraping ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                        Tentar novamente
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        onClick={() => setProduct({ name: "", image: null, price: null, description: null, url: link })}
+                      >
+                        Preencher manualmente
+                      </Button>
+                    </div>
+                    <div className="flex justify-between border-t border-border/30 pt-4">
+                      <Button variant="ghost" onClick={handleBack}><ArrowLeft className="w-4 h-4 mr-2" /> Voltar</Button>
+                      <Button onClick={handleNext}>Continuar <ArrowRight className="w-4 h-4 ml-2" /></Button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -374,8 +402,8 @@ const CreateArt = () => {
 
                   <div className="flex flex-col gap-4 w-full max-w-sm">
                     <DownloadArtButton
-                      productName={titulo}
-                      price={valor}
+                      productName={product?.name ?? ""}
+                      price={product?.price ?? ""}
                       elementId="template-preview"
                     />
                     <div className="grid grid-cols-2 gap-4">
@@ -415,27 +443,27 @@ const CreateArt = () => {
               </div>
               {/* Centro – 50% imagem */}
               <div className="absolute left-[5%] right-[5%] top-[20%] h-[50%] bg-white rounded-xl flex items-center justify-center p-4 shadow-lg">
-                {displayImage ? (
+                {product?.image ? (
                   <img 
-                    src={displayImage} 
-                    alt={titulo} 
+                    src={product.image} 
+                    alt={product.name} 
                     crossOrigin="anonymous" 
                     referrerPolicy="no-referrer"
                     className="max-h-full max-w-full object-contain rounded-lg drop-shadow-2xl" 
                   />
                 ) : (
-                  <div className="w-full h-full bg-muted rounded-lg flex items-center justify-center text-muted-foreground text-sm">
-                    Imagem do Produto
+                  <div className="w-full h-full bg-muted rounded-lg flex items-center justify-center text-muted-foreground text-sm text-center px-4">
+                    Cole o link de um produto para ver a imagem aqui
                   </div>
                 )}
               </div>
               {/* Rodapé – 30% */}
               <div className="absolute left-[5%] right-[5%] bottom-0 h-[30%] flex flex-col items-center justify-center gap-3 z-10">
                 <h3 className="text-base font-montserrat font-normal text-white text-center leading-tight line-clamp-3 drop-shadow-lg px-2">
-                  {titulo || 'Nome do Produto'}
+                  {product?.name || 'Seu Produto'}
                 </h3>
                 <div className="bg-white rounded-full px-6 py-2 shadow-lg">
-                  <span className="text-2xl font-montserrat font-bold text-gray-900">R$ {formatPrice(valor) || '--,--'}</span>
+                  <span className="text-2xl font-montserrat font-bold text-gray-900">R$ {formatPrice(product?.price ?? "") || '--,--'}</span>
                 </div>
                 <div className="px-5 py-1.5 border-2 border-white/50 rounded-full">
                   <span className="text-[10px] font-bold text-white uppercase">{cta}</span>
