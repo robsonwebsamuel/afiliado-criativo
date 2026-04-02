@@ -49,8 +49,13 @@ Deno.serve(async (req) => {
 async function extractProduct(url: string) {
   let processedUrl = url;
   
-  // Handle Shopee short links
-  if (url.includes("shope.ee/")) {
+  // Handle Short links (Shopee & Mercado Livre)
+  const isShortLink = 
+    url.includes("shope.ee/") || 
+    url.includes("mercadolivre.com/sec/") || 
+    url.includes("ml.com.br/");
+
+  if (isShortLink) {
     try {
       const res = await fetch(url, { redirect: "follow", method: "HEAD" });
       processedUrl = res.url;
@@ -284,21 +289,21 @@ async function scrapeAmazon(url: string) {
 async function scrapeMercadoLivre(url: string) {
   // Try API first
   const mlbMatch =
-    url.match(/\/p\/(MLB\d+)/i)?.[1] ||
+    url.match(/\/p\/(MLB-?\d+)/i)?.[1] ||
     url.match(/MLB-?(\d+)/i)?.[0]?.replace("-", "");
-  const mlbId = mlbMatch?.toUpperCase();
+  const mlbId = mlbMatch?.toUpperCase().replace("-", "");
 
   if (mlbId) {
     try {
-      const apiRes = await fetch(`https://api.mercadolibre.com/items/${mlbId.toUpperCase()}`, {
+      const apiRes = await fetch(`https://api.mercadolibre.com/items/${mlbId}`, {
         headers: { Accept: "application/json" },
       });
       if (apiRes.ok) {
         const item = await apiRes.json();
         return {
           name: item.title ?? "Nome do produto",
-          price: item.price ? item.price.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : null,
-          image: item.thumbnail?.replace("I.jpg", "O.jpg") ?? null,
+          price: item.price ? item.price.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : null,
+          image: item.thumbnail?.replace("-I.jpg", "-O.jpg") ?? null,
           description: null,
           url,
           source: "mercadolivre",
@@ -316,24 +321,23 @@ async function scrapeMercadoLivre(url: string) {
   // Clean ML title suffixes
   if (name) {
     name = name
-      .replace(/\s*\|\s*MercadoLivre.*$/i, "")
-      .replace(/\s*-\s*Mercado Livre.*$/i, "")
+      .replace(/\s*\|\s*Mercado\s*Livre.*$/i, "")
+      .replace(/\s*-\s*Mercado\s*Livre.*$/i, "")
       .trim();
   }
 
-  // Fallback: extract name from URL slug if title is generic
-  const genericNames = ["nome do produto", "mercado livre", "mercadolivre", ""];
-  if (!name || genericNames.includes(name.toLowerCase().trim())) {
-    const slugMatch = url.match(/mercadolivre\.com\.br\/([a-z0-9][a-z0-9\-]+[a-z0-9])/i);
-    if (slugMatch) {
-      name = decodeURIComponent(slugMatch[1])
-        .replace(/-/g, " ")
-        .replace(/\b\w/g, (c) => c.toUpperCase())
-        .substring(0, 200);
+  // Fallback price via fraction/cents spans if JSON-LD fails
+  let price = (jProduct ? extractPriceFromJsonLd(jProduct) : null);
+  if (!price) {
+    const fraction = html.match(/andes-money-amount__fraction">([\d.]+)/)?.[1];
+    const cents = html.match(/andes-money-amount__cents">(\d+)/)?.[1] || "00";
+    if (fraction) {
+      price = `${fraction},${cents}`;
+    } else {
+      price = extractPrice(html);
     }
   }
 
-  const price = (jProduct ? extractPriceFromJsonLd(jProduct) : null) || extractPrice(html);
   const image = (typeof jProduct?.image === "string" ? jProduct.image : Array.isArray(jProduct?.image) ? jProduct.image[0] : null) ||
     metaContent(html, "og:image");
 
