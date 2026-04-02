@@ -176,7 +176,7 @@ const CreateArt = () => {
                   </div>
                   <div className="text-center space-y-2 max-w-sm">
                     <h2 className="text-xl font-display font-bold text-foreground">Link do Produto</h2>
-                    <p className="text-sm text-muted-foreground">Cole o link da Shopee, Mercado Livre, Magazine Luiza ou outros.</p>
+                    <p className="text-sm text-muted-foreground">Cole o link do produto, Mercado Livre, Magazine Luiza ou outros.</p>
                   </div>
                   <div className="w-full max-w-md space-y-4">
                     <Input
@@ -246,7 +246,7 @@ const CreateArt = () => {
                         </div>
                         {/* Bottom: title + price */}
                         <div className="absolute left-[6%] right-[6%] bottom-[6%] flex flex-col items-center gap-0.5 z-10">
-                          <p className="text-[6px] font-bold text-white text-center leading-tight line-clamp-2 w-full drop-shadow">{product?.name || '---'}</p>
+                          <p className="text-[6px] font-bold text-white text-center leading-tight line-clamp-2 w-full drop-shadow">{product?.name || 'Nome do produto'}</p>
                           <span className="text-[8px] font-black text-white bg-black/30 px-1.5 py-0.5 rounded drop-shadow">{product?.price || '---'}</span>
                         </div>
                         <div className="absolute bottom-0.5 left-1 z-10">
@@ -460,7 +460,7 @@ const CreateArt = () => {
               {/* Rodapé – 30% */}
               <div className="absolute left-[5%] right-[5%] bottom-0 h-[30%] flex flex-col items-center justify-center gap-3 z-10">
                 <h3 className="text-base font-montserrat font-normal text-white text-center leading-tight line-clamp-3 drop-shadow-lg px-2">
-                  {product?.name || 'Seu Produto'}
+                  {product?.name || 'Nome do produto'}
                 </h3>
                 <div className="bg-white rounded-full px-6 py-2 shadow-lg">
                   <span className="text-2xl font-montserrat font-bold text-gray-900">R$ {formatPrice(product?.price ?? "") || '--,--'}</span>
