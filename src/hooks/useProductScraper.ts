@@ -46,7 +46,7 @@ export function useProductScraper() {
       }
 
       const productData: ProductData = {
-        name: data.name || "Produto sem nome",
+        name: data.name || "Nome do produto",
         image: data.image || null,
         description: data.description || null,
         price: data.price || null,

@@ -246,7 +246,7 @@ const CreateArt = () => {
                         </div>
                         {/* Bottom: title + price */}
                         <div className="absolute left-[6%] right-[6%] bottom-[6%] flex flex-col items-center gap-0.5 z-10">
-                          <p className="text-[6px] font-bold text-white text-center leading-tight line-clamp-2 w-full drop-shadow">{product?.name || '---'}</p>
+                          <p className="text-[6px] font-bold text-white text-center leading-tight line-clamp-2 w-full drop-shadow">{product?.name || 'Nome do produto'}</p>
                           <span className="text-[8px] font-black text-white bg-black/30 px-1.5 py-0.5 rounded drop-shadow">{product?.price || '---'}</span>
                         </div>
                         <div className="absolute bottom-0.5 left-1 z-10">
