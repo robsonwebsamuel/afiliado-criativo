@@ -1,60 +1,150 @@
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
+const USER_AGENTS = [
+  "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+];
+
+function randomUA() {
+  return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+}
+
 Deno.serve(async (req) => {
-  // CORS handling
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization, x-client-info, apikey",
-      },
-    });
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const { url } = await req.json();
-    if (!url) return new Response("Missing url", { status: 400 });
+    if (!url) {
+      return new Response(JSON.stringify({ error: "URL obrigatória" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const result = await extractProduct(url);
-    
+
     return new Response(JSON.stringify(result), {
-      headers: { 
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
+    console.error("scrape-product error:", e);
     return new Response(
       JSON.stringify({ error: e.message ?? "Erro desconhecido" }),
-      { 
-        status: 500, 
-        headers: { 
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-        } 
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
   }
 });
 
+// ─── Router ──────────────────────────────────────────────────────────────────
 async function extractProduct(url: string) {
   const hostname = new URL(url).hostname.toLowerCase();
-
   try {
-    if (hostname.includes("shopee.com.br"))   return await scrapeShopee(url);
-    if (hostname.includes("amazon.com.br"))   return await scrapeAmazon(url);
-    if (hostname.includes("mercadolivre") ||
-        hostname.includes("mercadopago"))     return await scrapeMercadoLivre(url);
-    if (hostname.includes("hotmart.com"))     return await scrapeHotmart(url);
-    if (hostname.includes("kiwify.com.br"))   return await scrapeKiwify(url);
-    if (hostname.includes("monetizze.com.br"))return await scrapeMetaTags(url);
-
-    // Fallback genérico para outros sites
-    return await scrapeMetaTags(url);
+    if (hostname.includes("shopee.com.br")) return await scrapeShopee(url);
+    if (hostname.includes("amazon.com.br")) return await scrapeAmazon(url);
+    if (hostname.includes("mercadolivre") || hostname.includes("mercadopago") || hostname.includes("produto.mercadolivre"))
+      return await scrapeMercadoLivre(url);
+    if (hostname.includes("hotmart.com")) return await scrapeGeneric(url, "hotmart");
+    if (hostname.includes("kiwify.com.br")) return await scrapeGeneric(url, "kiwify");
+    return await scrapeGeneric(url, hostname);
   } catch (e: any) {
-    console.error(`Error scraping ${hostname}:`, e.message);
-    // On error, still try the fallback instead of failing completely
-    return await scrapeMetaTags(url);
+    console.error(`Scrape error for ${hostname}:`, e.message);
+    return await scrapeGeneric(url, hostname);
   }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function decodeHtmlEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)));
+}
+
+function extractJsonLd(html: string): any[] {
+  const results: any[] = [];
+  const regex = /<script[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let m;
+  while ((m = regex.exec(html)) !== null) {
+    try {
+      const parsed = JSON.parse(m[1]);
+      if (Array.isArray(parsed)) results.push(...parsed);
+      else results.push(parsed);
+    } catch { /* ignore */ }
+  }
+  return results;
+}
+
+function findProductInJsonLd(items: any[]): any | null {
+  for (const item of items) {
+    if (item["@type"] === "Product" || item["@type"]?.includes?.("Product")) return item;
+    if (item["@graph"]) {
+      const found = findProductInJsonLd(item["@graph"]);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function extractPriceFromJsonLd(product: any): string | null {
+  const offers = product.offers;
+  if (!offers) return null;
+  const price = offers.price ?? offers.lowPrice ?? (Array.isArray(offers) ? offers[0]?.price : null);
+  if (!price) return null;
+  return Number(price).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function metaContent(html: string, property: string): string | null {
+  const patterns = [
+    new RegExp(`<meta[^>]*property=["']${property}["'][^>]*content=["']([^"']+)["']`, "i"),
+    new RegExp(`<meta[^>]*content=["']([^"']+)["'][^>]*property=["']${property}["']`, "i"),
+    new RegExp(`<meta[^>]*name=["']${property}["'][^>]*content=["']([^"']+)["']`, "i"),
+    new RegExp(`<meta[^>]*content=["']([^"']+)["'][^>]*name=["']${property}["']`, "i"),
+  ];
+  for (const p of patterns) {
+    const m = html.match(p);
+    if (m?.[1]) return decodeHtmlEntities(m[1].trim());
+  }
+  return null;
+}
+
+function extractTitle(html: string): string | null {
+  const m = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+  return m?.[1] ? decodeHtmlEntities(m[1].trim()) : null;
+}
+
+function extractPrice(html: string): string | null {
+  const raw =
+    metaContent(html, "product:price:amount") ||
+    html.match(/R\$\s*([\d.,]+)/)?.[1];
+  if (!raw) return null;
+  const n = parseFloat(raw.replace(/\./g, "").replace(",", "."));
+  if (isNaN(n) || n <= 0) return null;
+  return n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+async function fetchHtml(url: string): Promise<string> {
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": randomUA(),
+      Accept: "text/html,application/xhtml+xml",
+      "Accept-Language": "pt-BR,pt;q=0.9",
+    },
+  });
+  return await res.text();
 }
 
 // ─── SHOPEE ──────────────────────────────────────────────────────────────────
@@ -63,269 +153,172 @@ async function scrapeShopee(url: string) {
   let itemId: string | null = null;
 
   const matchI = url.match(/i\.(\d+)\.(\d+)/);
-  if (matchI) {
-    shopId = matchI[1];
-    itemId = matchI[2];
-  }
+  if (matchI) { shopId = matchI[1]; itemId = matchI[2]; }
 
   const urlObj = new URL(url);
   if (!shopId) shopId = urlObj.searchParams.get("shopid");
   if (!itemId) itemId = urlObj.searchParams.get("itemid");
 
-  if (!shopId || !itemId) throw new Error("Não foi possível extrair shopId/itemId da URL da Shopee");
+  if (!shopId || !itemId) throw new Error("Shopee: shopId/itemId não encontrados");
 
   const apiUrl = `https://shopee.com.br/api/v4/item/get?itemid=${itemId}&shopid=${shopId}`;
-
   const res = await fetch(apiUrl, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      "Referer": "https://shopee.com.br/",
-      "Accept": "application/json",
-    },
+    headers: { "User-Agent": randomUA(), Referer: "https://shopee.com.br/", Accept: "application/json" },
   });
-
   const json = await res.json();
   const item = json?.data;
+  if (!item) throw new Error("Shopee API sem dados");
 
-  if (!item) throw new Error("API Shopee não retornou dados do produto");
-
-  const name = item.name ?? "Nome do produto";
-  const price = item.price
-    ? (item.price / 100000).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    : null;
-  const image = item.image
-    ? `https://down-br.img.susercontent.com/file/${item.image}`
-    : null;
-  const description = item.description?.substring(0, 400) ?? null;
-
-  return { name, price, image, description, url, source: "shopee" };
+  return {
+    name: item.name ?? "Nome do produto",
+    price: item.price ? (item.price / 100000).toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : null,
+    image: item.image ? `https://down-br.img.susercontent.com/file/${item.image}` : null,
+    description: item.description?.substring(0, 400) ?? null,
+    url,
+    source: "shopee",
+  };
 }
 
 // ─── AMAZON ──────────────────────────────────────────────────────────────────
 async function scrapeAmazon(url: string) {
-  const asin = url.match(/\/dp\/([A-Z0-9]{10})/)?.[1] ||
-               url.match(/\/gp\/product\/([A-Z0-9]{10})/)?.[1];
-
+  const asin = url.match(/\/dp\/([A-Z0-9]{10})/)?.[1] || url.match(/\/gp\/product\/([A-Z0-9]{10})/)?.[1];
   const cleanUrl = asin ? `https://www.amazon.com.br/dp/${asin}` : url;
+  const html = await fetchHtml(cleanUrl);
 
-  const res = await fetch(cleanUrl, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      "Accept-Language": "pt-BR,pt;q=0.9",
-      "Accept": "text/html,application/xhtml+xml",
-      "Cache-Control": "no-cache",
-    },
-  });
-
-  const html = await res.text();
+  // Try JSON-LD first
+  const jsonLd = extractJsonLd(html);
+  const jProduct = findProductInJsonLd(jsonLd);
 
   const name =
+    jProduct?.name ||
     html.match(/<span id="productTitle"[^>]*>\s*([\s\S]*?)\s*<\/span>/)?.[1]?.trim() ||
-    html.match(/<meta name="title" content="([^"]+)"/)?.[1] ||
-    html.match(/<title>([^<]+)<\/title>/)?.[1]?.replace(/\s*:\s*Amazon\.com\.br.*/, "")?.trim() ||
-    null;
+    metaContent(html, "title") ||
+    extractTitle(html)?.replace(/\s*:\s*Amazon\.com\.br.*/, "")?.trim();
 
-  const priceMatch = 
-    html.match(/"priceAmount":"?([\d.]+)"?/)?.[1] ||
-    html.match(/class="a-price-whole">([^<]+)<\/span>/)?.[1]?.replace(/\D/g, "") ||
-    html.match(/"price":"R\$\s*([\d.,]+)"/)?.[1];
+  const price =
+    (jProduct ? extractPriceFromJsonLd(jProduct) : null) ||
+    (() => {
+      const m = html.match(/"priceAmount":"?([\d.]+)"?/)?.[1] ||
+                html.match(/class="a-price-whole">([^<]+)<\/span>/)?.[1]?.replace(/\D/g, "");
+      if (!m) return null;
+      return parseFloat(m).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+    })();
 
   const image =
+    jProduct?.image ||
     html.match(/"large":"(https:\/\/m\.media-amazon\.com\/images\/[^"]+)"/)?.[1] ||
-    html.match(/<meta property="og:image" content="([^"]+)"/)?.[1] ||
-    html.match(/id="landingImage"[^>]*src="([^"]+)"/)?.[1] ||
-    html.match(/"hiRes":"(https:\/\/[^"]+)"/)?.[1] ||
-    null;
-
-  const description =
-    html.match(/<meta name="description" content="([^"]+)"/)?.[1] ||
-    null;
-
-  const formattedPrice = priceMatch
-    ? parseFloat(priceMatch.replace(",", ".")).toLocaleString("pt-BR", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })
-    : null;
+    metaContent(html, "og:image") ||
+    html.match(/"hiRes":"(https:\/\/[^"]+)"/)?.[1];
 
   return {
     name: name?.substring(0, 200) ?? "Nome do produto",
-    price: formattedPrice,
-    image,
-    description: description?.substring(0, 400) ?? null,
+    price: price ?? null,
+    image: (typeof image === "string" ? image : Array.isArray(image) ? image[0] : null) ?? null,
+    description: metaContent(html, "description")?.substring(0, 400) ?? null,
     url,
     source: "amazon",
   };
 }
 
-// ─── MERCADO LIVRE ────────────────────────────────────────────────────────────
+// ─── MERCADO LIVRE ───────────────────────────────────────────────────────────
 async function scrapeMercadoLivre(url: string) {
-  const mlbId = url.match(/MLB-?(\d+)/i)?.[0]?.replace("-", "") ||
-                url.match(/\/p\/(MLB\d+)/i)?.[1] ||
-                null;
+  // Try API first
+  const mlbMatch =
+    url.match(/\/p\/(MLB\d+)/i)?.[1] ||
+    url.match(/MLB-?(\d+)/i)?.[0]?.replace("-", "");
+  const mlbId = mlbMatch?.toUpperCase();
 
   if (mlbId) {
-    const apiUrl = `https://api.mercadolibre.com/items/${mlbId.toUpperCase()}`;
-    const res = await fetch(apiUrl, {
-      headers: { "Accept": "application/json" },
-    });
+    try {
+      const apiRes = await fetch(`https://api.mercadolibre.com/items/${mlbId.toUpperCase()}`, {
+        headers: { Accept: "application/json" },
+      });
+      if (apiRes.ok) {
+        const item = await apiRes.json();
+        return {
+          name: item.title ?? "Nome do produto",
+          price: item.price ? item.price.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : null,
+          image: item.thumbnail?.replace("I.jpg", "O.jpg") ?? null,
+          description: null,
+          url,
+          source: "mercadolivre",
+        };
+      }
+    } catch { /* fallback to HTML */ }
+  }
 
-    if (res.ok) {
-      const item = await res.json();
-      const name = item.title ?? "Nome do produto";
-      const price = item.price
-        ? item.price.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-        : null;
-      const image = item.thumbnail?.replace("I.jpg", "O.jpg") ?? null;
-      return { name, price, image, description: null, url, source: "mercadolivre" };
+  // Fallback: HTML scraping
+  const html = await fetchHtml(url);
+  const jsonLd = extractJsonLd(html);
+  const jProduct = findProductInJsonLd(jsonLd);
+
+  let name = jProduct?.name || metaContent(html, "og:title") || extractTitle(html);
+  // Clean ML title suffixes
+  if (name) {
+    name = name
+      .replace(/\s*\|\s*MercadoLivre.*$/i, "")
+      .replace(/\s*-\s*Mercado Livre.*$/i, "")
+      .trim();
+  }
+
+  // Fallback: extract name from URL slug if title is generic
+  const genericNames = ["nome do produto", "mercado livre", "mercadolivre", ""];
+  if (!name || genericNames.includes(name.toLowerCase().trim())) {
+    const slugMatch = url.match(/mercadolivre\.com\.br\/([a-z0-9][a-z0-9\-]+[a-z0-9])/i);
+    if (slugMatch) {
+      name = decodeURIComponent(slugMatch[1])
+        .replace(/-/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase())
+        .substring(0, 200);
     }
   }
 
-  return await scrapeMetaTags(url);
-}
-
-// ─── HOTMART ─────────────────────────────────────────────────────────────────
-async function scrapeHotmart(url: string) {
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1)",
-      "Accept": "text/html",
-    },
-  });
-  const html = await res.text();
-
-  const name =
-    html.match(/<meta property="og:title" content="([^"]+)"/)?.[1] ||
-    html.match(/<title>([^<]+)<\/title>/)?.[1]?.trim() ||
-    null;
-
-  const image =
-    html.match(/<meta property="og:image" content="([^"]+)"/)?.[1] ||
-    null;
-
-  const priceMatch =
-    html.match(/R\$\s*([\d.,]+)/)?.[1] ||
-    html.match(/"price"\s*:\s*"?([\d.,]+)"?/)?.[1];
-
-  const description =
-    html.match(/<meta name="description" content="([^"]+)"/)?.[1] ||
-    null;
-
-  const formattedPrice = priceMatch
-    ? parseFloat(priceMatch.replace(/\./g, "").replace(",", ".")).toLocaleString("pt-BR", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })
-    : null;
+  const price = (jProduct ? extractPriceFromJsonLd(jProduct) : null) || extractPrice(html);
+  const image = (typeof jProduct?.image === "string" ? jProduct.image : Array.isArray(jProduct?.image) ? jProduct.image[0] : null) ||
+    metaContent(html, "og:image");
 
   return {
     name: name?.substring(0, 200) ?? "Nome do produto",
-    price: formattedPrice,
+    price,
     image,
-    description: description?.substring(0, 400) ?? null,
+    description: metaContent(html, "og:description")?.substring(0, 400) ?? null,
     url,
-    source: "hotmart",
+    source: "mercadolivre",
   };
 }
 
-// ─── KIWIFY ───────────────────────────────────────────────────────────────────
-async function scrapeKiwify(url: string) {
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1)",
-      "Accept": "text/html",
-    },
-  });
-  const html = await res.text();
-
-  const name =
-    html.match(/<meta property="og:title" content="([^"]+)"/)?.[1] ||
-    html.match(/"productName"\s*:\s*"([^"]+)"/)?.[1] ||
-    html.match(/<title>([^<]+)<\/title>/)?.[1]?.trim() ||
-    null;
-
-  const image =
-    html.match(/<meta property="og:image" content="([^"]+)"/)?.[1] ||
-    html.match(/"coverImage"\s*:\s*"([^"]+)"/)?.[1] ||
-    null;
-
-  const priceMatch =
-    html.match(/"price"\s*:\s*([\d.]+)/)?.[1] ||
-    html.match(/R\$\s*([\d.,]+)/)?.[1];
-
-  const formattedPrice = priceMatch
-    ? parseFloat(priceMatch.replace(/\./g, "").replace(",", ".")).toLocaleString("pt-BR", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })
-    : null;
-
-  return {
-    name: name?.substring(0, 200) ?? "Nome do produto",
-    price: formattedPrice,
-    image,
-    description: null,
-    url,
-    source: "kiwify",
-  };
-}
-
-// ─── FALLBACK GENÉRICO (meta tags OG) ────────────────────────────────────────
-async function scrapeMetaTags(url: string) {
+// ─── GENERIC (OG + JSON-LD) ─────────────────────────────────────────────────
+async function scrapeGeneric(url: string, source: string) {
   try {
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
-        "Accept": "text/html,application/xhtml+xml",
-        "Accept-Language": "pt-BR,pt;q=0.9",
-      },
-    });
-    const html = await res.text();
+    const html = await fetchHtml(url);
+    const jsonLd = extractJsonLd(html);
+    const jProduct = findProductInJsonLd(jsonLd);
 
     const name =
-      html.match(/<meta property="og:title" content="([^"]+)"/)?.[1] ||
-      html.match(/<meta name="title" content="([^"]+)"/)?.[1] ||
-      html.match(/<title>([^|–\-<]+)/)?.[1]?.trim() ||
+      jProduct?.name ||
+      metaContent(html, "og:title") ||
+      metaContent(html, "title") ||
+      extractTitle(html) ||
       "Nome do produto";
 
+    const price =
+      (jProduct ? extractPriceFromJsonLd(jProduct) : null) ||
+      extractPrice(html);
+
     const image =
-      html.match(/<meta property="og:image" content="([^"]+)"/)?.[1] ||
-      html.match(/<meta name="twitter:image" content="([^"]+)"/)?.[1] ||
-      null;
-
-    const priceRaw =
-      html.match(/<meta property="product:price:amount" content="([^"]+)"/)?.[1] ||
-      html.match(/R\$\s*([\d.,]+)/)?.[1] ||
-      null;
-
-    const price = priceRaw
-      ? parseFloat(priceRaw.replace(/\./g, "").replace(",", ".")).toLocaleString("pt-BR", {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })
-      : null;
-
-    const description =
-      html.match(/<meta property="og:description" content="([^"]+)"/)?.[1] ||
-      html.match(/<meta name="description" content="([^"]+)"/)?.[1] ||
-      null;
+      (typeof jProduct?.image === "string" ? jProduct.image : Array.isArray(jProduct?.image) ? jProduct.image[0] : null) ||
+      metaContent(html, "og:image") ||
+      metaContent(html, "twitter:image");
 
     return {
-      name: name.substring(0, 200),
+      name: decodeHtmlEntities(name).substring(0, 200),
       price,
       image,
-      description: description?.substring(0, 400) ?? null,
+      description: (metaContent(html, "og:description") || metaContent(html, "description"))?.substring(0, 400) ?? null,
       url,
-      source: new URL(url).hostname,
+      source,
     };
-  } catch (e) {
-    return {
-      name: "Nome do produto",
-      price: null,
-      image: null,
-      description: null,
-      url,
-      source: new URL(url).hostname,
-    };
+  } catch {
+    return { name: "Nome do produto", price: null, image: null, description: null, url, source };
   }
 }
