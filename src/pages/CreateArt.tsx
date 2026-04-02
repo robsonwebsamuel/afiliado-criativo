@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { templates } from "@/lib/mock-data";
 import { formatPrice } from "@/lib/formatPrice";
 import { DownloadArtButton } from "@/components/DownloadArtButton";
+import { Badge } from "@/components/ui/badge";
 
 type Step = 'link' | 'template' | 'caption' | 'download';
 
@@ -266,7 +267,14 @@ const CreateArt = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Nome */}
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Nome do Produto</label>
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Nome do Produto</label>
+                          {product?.name && product.name !== "Nome do produto" ? (
+                            <Badge variant="outline" className="text-[9px] py-0 px-1.5 h-auto bg-green-50 text-green-600 border-green-200 font-medium">Automatico</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[9px] py-0 px-1.5 h-auto bg-amber-50 text-amber-600 border-amber-200 font-medium">Manual</Badge>
+                          )}
+                        </div>
                         <Input 
                           placeholder="Nome do produto"
                           value={product?.name ?? ""} 
@@ -275,7 +283,14 @@ const CreateArt = () => {
                       </div>
                       {/* Preço */}
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Preço</label>
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Preço</label>
+                          {product?.price ? (
+                            <Badge variant="outline" className="text-[9px] py-0 px-1.5 h-auto bg-green-50 text-green-600 border-green-200 font-medium">Automatico</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[9px] py-0 px-1.5 h-auto bg-amber-50 text-amber-600 border-amber-200 font-medium">Manual</Badge>
+                          )}
+                        </div>
                         <Input 
                           placeholder="Ex: 199,90"
                           value={product?.price ?? ""} 
@@ -302,7 +317,14 @@ const CreateArt = () => {
                         </div>
                       </div>
                       <div className="space-y-1 flex flex-col justify-end">
-                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">URL da Imagem</label>
+                        <div className="flex items-center gap-2 mb-1">
+                          <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">URL da Imagem</label>
+                          {product?.image ? (
+                            <Badge variant="outline" className="text-[9px] py-0 px-1.5 h-auto bg-green-50 text-green-600 border-green-200 font-medium">Automatico</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[9px] py-0 px-1.5 h-auto bg-amber-50 text-amber-600 border-amber-200 font-medium">Manual</Badge>
+                          )}
+                        </div>
                         <Input 
                           placeholder="Cole a URL da imagem manualmente"
                           value={product?.image ?? ""} 
