@@ -223,9 +223,10 @@ async function scrapeAmazon(url: string) {
 // ─── MERCADO LIVRE ───────────────────────────────────────────────────────────
 async function scrapeMercadoLivre(url: string) {
   // Try API first
-  const mlbId =
-    url.match(/MLB-?(\d+)/i)?.[0]?.replace("-", "") ||
-    url.match(/\/p\/(MLB\d+)/i)?.[1];
+  const mlbMatch =
+    url.match(/\/p\/(MLB\d+)/i)?.[1] ||
+    url.match(/MLB-?(\d+)/i)?.[0]?.replace("-", "");
+  const mlbId = mlbMatch?.toUpperCase();
 
   if (mlbId) {
     try {
