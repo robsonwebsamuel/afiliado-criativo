@@ -176,7 +176,7 @@ const CreateArt = () => {
                   </div>
                   <div className="text-center space-y-2 max-w-sm">
                     <h2 className="text-xl font-display font-bold text-foreground">Link do Produto</h2>
-                    <p className="text-sm text-muted-foreground">Cole o link da Shopee, Mercado Livre, Magazine Luiza ou outros.</p>
+                    <p className="text-sm text-muted-foreground">Cole o link do produto, Mercado Livre, Magazine Luiza ou outros.</p>
                   </div>
                   <div className="w-full max-w-md space-y-4">
                     <Input

@@ -83,7 +83,7 @@ export function useProductScraper() {
       toast.error("Não foi possível carregar os dados automaticamente.");
       
       const fallbackData: ProductData = {
-        name: "Produto",
+        name: "Nome do produto",
         image: null,
         description: null,
         price: null,
