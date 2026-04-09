@@ -13,9 +13,9 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full bg-background text-foreground">
         <AppSidebar />
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 bg-background">
           {/* Top bar */}
           <header className="h-14 flex items-center justify-between border-b border-border/50 px-4 shrink-0">
             <div className="flex items-center gap-2">
@@ -47,7 +47,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           )}
 
           {/* Main content */}
-          <main className="flex-1 overflow-auto p-6">
+          <main className="flex-1 overflow-auto p-6 bg-background text-foreground relative z-0">
             {children}
           </main>
         </div>

@@ -1,7 +1,7 @@
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 const USER_AGENTS = [
@@ -12,6 +12,12 @@ const USER_AGENTS = [
 
 function randomUA() {
   return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+}
+
+function ok(data: any) {
+  return new Response(JSON.stringify(data), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 }
 
 Deno.serve(async (req) => {
@@ -28,31 +34,35 @@ Deno.serve(async (req) => {
       });
     }
 
+    console.log("scrape-product called with:", url);
     const result = await extractProduct(url);
+    console.log("scrape-product result:", JSON.stringify({ name: result.name, price: result.price, hasImage: !!result.image, source: result.source }));
 
-    return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return ok(result);
   } catch (e: any) {
     console.error("scrape-product error:", e);
-    return new Response(
-      JSON.stringify({ error: e.message ?? "Erro desconhecido" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    // Graceful degradation - never return 500
+    return ok({
+      name: "Nome do produto",
+      price: null,
+      image: null,
+      description: null,
+      url: "",
+      source: "error",
+      fallback: true,
+      error: e.message ?? "Erro desconhecido",
+    });
   }
 });
 
 // ─── Router ──────────────────────────────────────────────────────────────────
 async function extractProduct(url: string) {
   let processedUrl = url;
-  
-  // Handle Short links (Shopee & Mercado Livre)
-  const isShortLink = 
-    url.includes("shope.ee/") || 
-    url.includes("mercadolivre.com/sec/") || 
+
+  // Handle short links
+  const isShortLink =
+    url.includes("shope.ee/") ||
+    url.includes("mercadolivre.com/sec/") ||
     url.includes("ml.com.br/");
 
   if (isShortLink) {
@@ -65,7 +75,7 @@ async function extractProduct(url: string) {
   const hostname = new URL(processedUrl).hostname.toLowerCase();
   try {
     if (hostname.includes("shopee.com.br")) return await scrapeShopee(processedUrl);
-    if (hostname.includes("amazon.com.br")) return await scrapeAmazon(processedUrl);
+    if (hostname.includes("amazon.com.br") || hostname.includes("amazon.com")) return await scrapeAmazon(processedUrl);
     if (hostname.includes("mercadolivre") || hostname.includes("mercadopago") || hostname.includes("produto.mercadolivre"))
       return await scrapeMercadoLivre(processedUrl);
     if (hostname.includes("magazineluiza.com.br") || hostname.includes("magalu.com"))
@@ -75,8 +85,41 @@ async function extractProduct(url: string) {
     return await scrapeGeneric(processedUrl, hostname);
   } catch (e: any) {
     console.error(`Scrape error for ${hostname}:`, e.message);
-    return await scrapeGeneric(processedUrl, hostname);
+    // Try generic as last resort
+    try {
+      return await scrapeGeneric(processedUrl, hostname);
+    } catch {
+      // Extract what we can from URL
+      return extractFromUrl(processedUrl, hostname);
+    }
   }
+}
+
+// ─── Extract from URL slug ──────────────────────────────────────────────────
+function extractFromUrl(url: string, source: string) {
+  const urlObj = new URL(url);
+  const pathParts = urlObj.pathname.split("/").filter(Boolean);
+  // Find the longest slug-like segment
+  let bestSlug = "";
+  for (const part of pathParts) {
+    if (part.length > bestSlug.length && /[a-zA-Z]/.test(part)) {
+      bestSlug = part;
+    }
+  }
+  const name = bestSlug
+    .replace(/[-_]/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim();
+
+  return {
+    name: name || "Nome do produto",
+    price: null,
+    image: null,
+    description: null,
+    url,
+    source,
+    fallback: true,
+  };
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -149,6 +192,7 @@ function extractTitle(html: string): string | null {
 function extractPrice(html: string): string | null {
   const raw =
     metaContent(html, "product:price:amount") ||
+    metaContent(html, "og:price:amount") ||
     html.match(/R\$\s*([\d.,]+)/)?.[1];
   if (!raw) return null;
   const n = parseFloat(raw.replace(/\./g, "").replace(",", "."));
@@ -157,14 +201,21 @@ function extractPrice(html: string): string | null {
 }
 
 async function fetchHtml(url: string): Promise<string> {
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": randomUA(),
-      Accept: "text/html,application/xhtml+xml",
-      "Accept-Language": "pt-BR,pt;q=0.9",
-    },
-  });
-  return await res.text();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": randomUA(),
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+      },
+      signal: controller.signal,
+    });
+    return await res.text();
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 // ─── SHOPEE ──────────────────────────────────────────────────────────────────
@@ -172,11 +223,9 @@ async function scrapeShopee(url: string) {
   let shopId: string | null = null;
   let itemId: string | null = null;
 
-  // Pattern: i.SHOPID.ITEMID
   const matchI = url.match(/i\.(\d+)\.(\d+)/);
   if (matchI) { shopId = matchI[1]; itemId = matchI[2]; }
 
-  // Pattern: /product/SHOPID/ITEMID
   const matchP = url.match(/\/product\/(\d+)\/(\d+)/);
   if (matchP && !shopId) { shopId = matchP[1]; itemId = matchP[2]; }
 
@@ -184,30 +233,37 @@ async function scrapeShopee(url: string) {
   if (!shopId) shopId = urlObj.searchParams.get("shopid");
   if (!itemId) itemId = urlObj.searchParams.get("itemid");
 
-  if (!shopId || !itemId) throw new Error("Shopee: shopId/itemId não encontrados");
+  // Fallback to OG tags if no API IDs found
+  if (!shopId || !itemId) {
+    return await scrapeGeneric(url, "shopee");
+  }
 
-  const apiUrl = `https://shopee.com.br/api/v4/item/get?itemid=${itemId}&shopid=${shopId}`;
-  const res = await fetch(apiUrl, {
-    headers: { 
-      "User-Agent": randomUA(), 
-      "Referer": "https://shopee.com.br/", 
-      "Accept": "application/json",
-      "X-Shopee-Language": "pt-BR",
-    },
-  });
-  
-  const json = await res.json();
-  const item = json?.data;
-  if (!item) throw new Error("Shopee API sem dados");
+  try {
+    const apiUrl = `https://shopee.com.br/api/v4/item/get?itemid=${itemId}&shopid=${shopId}`;
+    const res = await fetch(apiUrl, {
+      headers: {
+        "User-Agent": randomUA(),
+        "Referer": "https://shopee.com.br/",
+        "Accept": "application/json",
+        "X-Shopee-Language": "pt-BR",
+      },
+    });
 
-  return {
-    name: item.name ?? "Nome do produto",
-    price: item.price ? (item.price / 100000).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : null,
-    image: item.image ? `https://down-br.img.susercontent.com/file/${item.image}` : null,
-    description: item.description?.substring(0, 400) ?? null,
-    url,
-    source: "shopee",
-  };
+    const json = await res.json();
+    const item = json?.data;
+    if (!item) return await scrapeGeneric(url, "shopee");
+
+    return {
+      name: item.name ?? "Nome do produto",
+      price: item.price ? (item.price / 100000).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : null,
+      image: item.image ? `https://down-br.img.susercontent.com/file/${item.image}` : null,
+      description: item.description?.substring(0, 400) ?? null,
+      url,
+      source: "shopee",
+    };
+  } catch {
+    return await scrapeGeneric(url, "shopee");
+  }
 }
 
 // ─── MAGAZINE LUIZA ──────────────────────────────────────────────────────────
@@ -219,23 +275,27 @@ async function scrapeMagalu(url: string) {
   const name =
     jProduct?.name ||
     metaContent(html, "og:title") ||
+    html.match(/<h1[^>]*class="[^"]*sc-[^"]*"[^>]*>([\s\S]*?)<\/h1>/)?.[1]?.trim() ||
     html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)?.[1]?.trim() ||
     extractTitle(html);
 
-  const price = 
+  const price =
     (jProduct ? extractPriceFromJsonLd(jProduct) : null) ||
     (() => {
       const m = html.match(/data-testid="price-value"[^>]*>R\$\s*([\d.,]+)/i);
-      return m ? m[1] : extractPrice(html);
+      if (m) return m[1];
+      const m2 = html.match(/class="[^"]*sc-[^"]*"[^>]*>R\$\s*([\d.,]+)/i);
+      if (m2) return m2[1];
+      return extractPrice(html);
     })();
 
-  const image = 
+  const image =
     (typeof jProduct?.image === "string" ? jProduct.image : Array.isArray(jProduct?.image) ? jProduct.image[0] : null) ||
     metaContent(html, "og:image") ||
     html.match(/<img[^>]*data-testid="image-selected"[^>]*src="([^"]+)"/i)?.[1];
 
   return {
-    name: decodeHtmlEntities(name || "Nome do produto").replace(/\s*-\s*Magazine Luiza.*/i, "").trim().substring(0, 200),
+    name: decodeHtmlEntities(name || "Nome do produto").replace(/\s*[-|]\s*Magazine Luiza.*/i, "").replace(/\s*[-|]\s*Magalu.*/i, "").trim().substring(0, 200),
     price,
     image,
     description: metaContent(html, "og:description")?.substring(0, 400) ?? null,
@@ -250,13 +310,13 @@ async function scrapeAmazon(url: string) {
   const cleanUrl = asin ? `https://www.amazon.com.br/dp/${asin}` : url;
   const html = await fetchHtml(cleanUrl);
 
-  // Try JSON-LD first
   const jsonLd = extractJsonLd(html);
   const jProduct = findProductInJsonLd(jsonLd);
 
   const name =
     jProduct?.name ||
     html.match(/<span id="productTitle"[^>]*>\s*([\s\S]*?)\s*<\/span>/)?.[1]?.trim() ||
+    metaContent(html, "og:title") ||
     metaContent(html, "title") ||
     extractTitle(html)?.replace(/\s*:\s*Amazon\.com\.br.*/, "")?.trim();
 
@@ -276,10 +336,10 @@ async function scrapeAmazon(url: string) {
     html.match(/"hiRes":"(https:\/\/[^"]+)"/)?.[1];
 
   return {
-    name: name?.substring(0, 200) ?? "Nome do produto",
+    name: decodeHtmlEntities(name || "Nome do produto").substring(0, 200),
     price: price ?? null,
     image: (typeof image === "string" ? image : Array.isArray(image) ? image[0] : null) ?? null,
-    description: metaContent(html, "description")?.substring(0, 400) ?? null,
+    description: (metaContent(html, "og:description") || metaContent(html, "description"))?.substring(0, 400) ?? null,
     url,
     source: "amazon",
   };
@@ -290,8 +350,10 @@ async function scrapeMercadoLivre(url: string) {
   // Try API first
   const mlbMatch =
     url.match(/\/p\/(MLB-?\d+)/i)?.[1] ||
-    url.match(/MLB-?(\d+)/i)?.[0]?.replace("-", "");
-  const mlbId = mlbMatch?.toUpperCase().replace("-", "");
+    url.match(/(MLB-?\d+)/i)?.[0];
+  const mlbId = mlbMatch?.toUpperCase().replace(/-/g, "");
+
+  console.log("ML scrape - mlbId:", mlbId, "from url:", url);
 
   if (mlbId) {
     try {
@@ -313,20 +375,29 @@ async function scrapeMercadoLivre(url: string) {
   }
 
   // Fallback: HTML scraping
-  const html = await fetchHtml(url);
+  let html = "";
+  try {
+    html = await fetchHtml(url);
+  } catch {
+    return extractFromUrl(url, "mercadolivre");
+  }
+
   const jsonLd = extractJsonLd(html);
   const jProduct = findProductInJsonLd(jsonLd);
 
   let name = jProduct?.name || metaContent(html, "og:title") || extractTitle(html);
-  // Clean ML title suffixes
   if (name) {
     name = name
       .replace(/\s*\|\s*Mercado\s*Livre.*$/i, "")
       .replace(/\s*-\s*Mercado\s*Livre.*$/i, "")
       .trim();
   }
+  // Fallback: extract from URL slug
+  if (!name || name === "Nome do produto" || name === "Mercado Livre" || name.length < 5) {
+    const fromUrl = extractFromUrl(url, "mercadolivre");
+    if (fromUrl.name !== "Nome do produto") name = fromUrl.name;
+  }
 
-  // Fallback price via fraction/cents spans if JSON-LD fails
   let price = (jProduct ? extractPriceFromJsonLd(jProduct) : null);
   if (!price) {
     const fraction = html.match(/andes-money-amount__fraction">([\d.]+)/)?.[1];
@@ -342,7 +413,7 @@ async function scrapeMercadoLivre(url: string) {
     metaContent(html, "og:image");
 
   return {
-    name: name?.substring(0, 200) ?? "Nome do produto",
+    name: decodeHtmlEntities(name || "Nome do produto").substring(0, 200),
     price,
     image,
     description: metaContent(html, "og:description")?.substring(0, 400) ?? null,
@@ -383,6 +454,6 @@ async function scrapeGeneric(url: string, source: string) {
       source,
     };
   } catch {
-    return { name: "Nome do produto", price: null, image: null, description: null, url, source };
+    return { name: "Nome do produto", price: null, image: null, description: null, url, source, fallback: true };
   }
 }
