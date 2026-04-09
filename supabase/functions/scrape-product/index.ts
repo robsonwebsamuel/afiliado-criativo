@@ -313,27 +313,35 @@ async function scrapeAmazon(url: string) {
   const jsonLd = extractJsonLd(html);
   const jProduct = findProductInJsonLd(jsonLd);
 
-  const name =
-    jProduct?.name ||
-    html.match(/<span id="productTitle"[^>]*>\s*([\s\S]*?)\s*<\/span>/)?.[1]?.trim() ||
-    metaContent(html, "og:title") ||
-    metaContent(html, "title") ||
-    extractTitle(html)?.replace(/\s*:\s*Amazon\.com\.br.*/, "")?.trim();
+  let name = jProduct?.name;
+  let price = jProduct ? extractPriceFromJsonLd(jProduct) : null;
+  let image = jProduct?.image;
 
-  const price =
-    (jProduct ? extractPriceFromJsonLd(jProduct) : null) ||
-    (() => {
-      const m = html.match(/"priceAmount":"?([\d.]+)"?/)?.[1] ||
-                html.match(/class="a-price-whole">([^<]+)<\/span>/)?.[1]?.replace(/\D/g, "");
-      if (!m) return null;
-      return parseFloat(m).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
-    })();
+  if (url.includes('amazon.com.br') || url.includes('amazon.com')) {
+    if (!name) name = html.match(/id="productTitle"[^>]*>\s*([^<]+)/)?.[1]?.trim();
+    if (!price) price = html.match(/class="a-price-whole">([^<]+)/)?.[1];
+    if (!image) {
+      image = html.match(/id="landingImage"[^>]*data-old-hires="([^"]+)"/)?.[1] ||
+              html.match(/id="imgBlkFront"[^>]*src="([^"]+)"/)?.[1];
+    }
+  }
 
-  const image =
-    jProduct?.image ||
-    html.match(/"large":"(https:\/\/m\.media-amazon\.com\/images\/[^"]+)"/)?.[1] ||
-    metaContent(html, "og:image") ||
-    html.match(/"hiRes":"(https:\/\/[^"]+)"/)?.[1];
+  if (!name) {
+    name = metaContent(html, "og:title") ||
+           metaContent(html, "title") ||
+           extractTitle(html)?.replace(/\s*:\s*Amazon\.com\.br.*/, "")?.trim();
+  }
+  
+  if (!price) {
+    const m = html.match(/"priceAmount":"?([\d.]+)"?/)?.[1];
+    if (m) price = parseFloat(m).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+  }
+
+  if (!image) {
+    image = html.match(/"large":"(https:\/\/m\.media-amazon\.com\/images\/[^"]+)"/)?.[1] ||
+            metaContent(html, "og:image") ||
+            html.match(/"hiRes":"(https:\/\/[^"]+)"/)?.[1];
+  }
 
   return {
     name: decodeHtmlEntities(name || "Nome do produto").substring(0, 200),
@@ -382,40 +390,41 @@ async function scrapeMercadoLivre(url: string) {
     return extractFromUrl(url, "mercadolivre");
   }
 
-  const jsonLd = extractJsonLd(html);
-  const jProduct = findProductInJsonLd(jsonLd);
+  let name, price, image;
 
-  let name = jProduct?.name || metaContent(html, "og:title") || extractTitle(html);
+  // Extrair do JSON-LD (mais confiável):
+  const jsonLd = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+  if (jsonLd) {
+    try {
+      const data = JSON.parse(jsonLd[1]);
+      name = data.name || data.headline;
+      price = data.offers?.price || data.offers?.lowPrice;
+      image = Array.isArray(data.image) ? data.image[0] : data.image;
+    } catch (e) { /* ignore json parse error */ }
+  }
+
+  // Fallback via og: tags
+  if (!image) image = html.match(/property="og:image"\s+content="([^"]+)"/)?.[1];
+  if (!price) price = html.match(/class="andes-money-amount__fraction[^"]*">([^<]+)/)?.[1];
+  if (!name) name = html.match(/property="og:title"\s+content="([^"]+)"/)?.[1];
+
   if (name) {
-    name = name
+    name = decodeHtmlEntities(name)
       .replace(/\s*\|\s*Mercado\s*Livre.*$/i, "")
       .replace(/\s*-\s*Mercado\s*Livre.*$/i, "")
       .trim();
   }
+  
   // Fallback: extract from URL slug
   if (!name || name === "Nome do produto" || name === "Mercado Livre" || name.length < 5) {
     const fromUrl = extractFromUrl(url, "mercadolivre");
     if (fromUrl.name !== "Nome do produto") name = fromUrl.name;
   }
 
-  let price = (jProduct ? extractPriceFromJsonLd(jProduct) : null);
-  if (!price) {
-    const fraction = html.match(/andes-money-amount__fraction">([\d.]+)/)?.[1];
-    const cents = html.match(/andes-money-amount__cents">(\d+)/)?.[1] || "00";
-    if (fraction) {
-      price = `${fraction},${cents}`;
-    } else {
-      price = extractPrice(html);
-    }
-  }
-
-  const image = (typeof jProduct?.image === "string" ? jProduct.image : Array.isArray(jProduct?.image) ? jProduct.image[0] : null) ||
-    metaContent(html, "og:image");
-
   return {
-    name: decodeHtmlEntities(name || "Nome do produto").substring(0, 200),
-    price,
-    image,
+    name: (name || "Nome do produto").substring(0, 200),
+    price: price || null,
+    image: image || null,
     description: metaContent(html, "og:description")?.substring(0, 400) ?? null,
     url,
     source: "mercadolivre",

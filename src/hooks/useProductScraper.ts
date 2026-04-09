@@ -30,7 +30,16 @@ export function useProductScraper() {
       );
 
       if (fnError) throw fnError;
-      if (data?.error) throw new Error(data.error);
+      // We will no longer indiscriminately throw on data.error if we have a valid name extracted via fallback
+
+      const extractedName = data?.name && data.name !== "Nome do produto" && data.name !== "Produto sem nome" ? data.name : null;
+
+      const isCompleteFailure = !extractedName;
+      const isPartialSuccess = extractedName && (!data?.price || !data?.image);
+
+      if (isCompleteFailure && data?.error) {
+         throw new Error(data.error);
+      }
 
       // Shorten link (preserved from previous version)
       let shortUrl = url;
@@ -46,28 +55,27 @@ export function useProductScraper() {
       }
 
       const productData: ProductData = {
-        name: data.name || "Nome do produto",
-        image: data.image || null,
-        description: data.description || null,
-        price: data.price || null,
-        url: data.url || url,
+        name: extractedName || "Nome do produto",
+        image: data?.image || null,
+        description: data?.description || null,
+        price: data?.price || null,
+        url: data?.url || url,
         shortUrl,
       };
 
-      // Valida campos obrigatórios
-      const missing: string[] = [];
-      if (!productData.name || productData.name === "Produto sem nome") missing.push("nome");
-      if (!productData.price) missing.push("preço");
-      if (!productData.image) missing.push("imagem");
-
       setProduct(productData);
 
-      // Avisa o usuário sobre campos que não foram encontrados
-      if (missing.length > 0) {
+      if (isCompleteFailure) {
+        throw new Error("Falha completa no scraping");
+      } else if (isPartialSuccess) {
+        const missing: string[] = [];
+        if (!productData.price) missing.push("preço");
+        if (!productData.image) missing.push("imagem");
+        
         setWarning(
-          `Não foi possível buscar automaticamente: ${missing.join(", ")}. ` +
-          `Por favor, preencha manualmente.`
+          `Não foi possível buscar automaticamente: ${missing.join(", ")}. Por favor, preencha manualmente.`
         );
+        // Avoid throwing error, it's a partial success
       } else {
         setWarning(null);
         toast.success("Produto carregado com sucesso!");
@@ -90,7 +98,7 @@ export function useProductScraper() {
         url: url,
       };
       setProduct(fallbackData);
-      return fallbackData;
+      return fallbackData; // Let the CreateArt component handle it
     } finally {
       setLoading(false);
     }
