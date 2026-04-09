@@ -333,7 +333,22 @@ const CreateArt = () => {
                           ) : (
                             <Badge variant="outline" className="text-[9px] py-0 px-1.5 h-auto bg-amber-50 text-amber-600 border-amber-200 font-medium">Manual</Badge>
                           )}
-                        </div>
+                    </div>
+
+                    {/* CTA Select */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Chamada para Ação (CTA)</label>
+                      <Select value={cta} onValueChange={setCta}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CTA_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                         <Input 
                           placeholder="Cole a URL da imagem manualmente"
                           value={product?.image ?? ""} 
@@ -413,7 +428,7 @@ const CreateArt = () => {
 
                   <div className="pt-4 flex justify-between">
                     <Button variant="ghost" onClick={handleBack}><ArrowLeft className="w-4 h-4 mr-2" /> Voltar</Button>
-                    <Button onClick={handleNext} disabled={!caption}>Finalizar <ArrowRight className="w-4 h-4 ml-2" /></Button>
+                    <Button onClick={handleNext}>Finalizar <ArrowRight className="w-4 h-4 ml-2" /></Button>
                   </div>
                 </div>
               )}
