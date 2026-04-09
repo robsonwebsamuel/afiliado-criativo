@@ -24,6 +24,15 @@ const CAPTION_STYLES = [
   { value: "storytelling", label: "📖 Storytelling" },
 ];
 
+const CTA_OPTIONS = [
+  { value: "Acesse agora e aproveite!", label: "Acesse agora e aproveite!" },
+  { value: "Compre agora", label: "Compre agora" },
+  { value: "Garanta o seu", label: "Garanta o seu" },
+  { value: "Acesse aqui", label: "Acesse aqui" },
+  { value: "Ver oferta", label: "Ver oferta" },
+  { value: "Aproveite já!", label: "Aproveite já!" },
+];
+
 const CreateArt = () => {
   const { product, loading: scraping, error: scrapeError, warning, fetchProduct, setProduct } = useProductScraper();
   const [link, setLink] = useState('');
