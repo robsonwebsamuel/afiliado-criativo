@@ -350,8 +350,10 @@ async function scrapeMercadoLivre(url: string) {
   // Try API first
   const mlbMatch =
     url.match(/\/p\/(MLB-?\d+)/i)?.[1] ||
-    url.match(/MLB-?(\d+)/i)?.[0]?.replace("-", "");
-  const mlbId = mlbMatch?.toUpperCase().replace("-", "");
+    url.match(/(MLB-?\d+)/i)?.[0];
+  const mlbId = mlbMatch?.toUpperCase().replace(/-/g, "");
+
+  console.log("ML scrape - mlbId:", mlbId, "from url:", url);
 
   if (mlbId) {
     try {
@@ -391,7 +393,7 @@ async function scrapeMercadoLivre(url: string) {
       .trim();
   }
   // Fallback: extract from URL slug
-  if (!name || name === "Nome do produto") {
+  if (!name || name === "Nome do produto" || name === "Mercado Livre" || name.length < 5) {
     const fromUrl = extractFromUrl(url, "mercadolivre");
     if (fromUrl.name !== "Nome do produto") name = fromUrl.name;
   }
