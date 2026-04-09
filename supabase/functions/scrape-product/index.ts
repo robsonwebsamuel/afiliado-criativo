@@ -339,7 +339,7 @@ async function scrapeAmazon(url: string) {
     name: decodeHtmlEntities(name || "Nome do produto").substring(0, 200),
     price: price ?? null,
     image: (typeof image === "string" ? image : Array.isArray(image) ? image[0] : null) ?? null,
-    description: metaContent(html, "og:description") || metaContent(html, "description")?.substring(0, 400) ?? null,
+    description: (metaContent(html, "og:description") || metaContent(html, "description"))?.substring(0, 400) ?? null,
     url,
     source: "amazon",
   };
