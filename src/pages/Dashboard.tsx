@@ -32,7 +32,7 @@ const Dashboard = () => {
         {/* Header */}
         <div className="space-y-1">
           <h1 className="text-2xl font-display font-bold text-foreground">
-            Olá, {displayName.split(' ')[0]}! 👋
+            Olá, {(user?.user_metadata?.full_name || user?.user_metadata?.display_name || displayName).split(' ')[0]}! 👋
           </h1>
           <p className="text-muted-foreground text-sm">
             Seu Post Pronto em Segundos
