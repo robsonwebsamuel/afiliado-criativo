@@ -223,9 +223,11 @@ async function scrapeShopee(url: string) {
   let shopId: string | null = null;
   let itemId: string | null = null;
 
+  // Pattern: i.SHOPID.ITEMID
   const matchI = url.match(/i\.(\d+)\.(\d+)/);
   if (matchI) { shopId = matchI[1]; itemId = matchI[2]; }
 
+  // Pattern: /product/SHOPID/ITEMID
   const matchP = url.match(/\/product\/(\d+)\/(\d+)/);
   if (matchP && !shopId) { shopId = matchP[1]; itemId = matchP[2]; }
 
@@ -233,36 +235,92 @@ async function scrapeShopee(url: string) {
   if (!shopId) shopId = urlObj.searchParams.get("shopid");
   if (!itemId) itemId = urlObj.searchParams.get("itemid");
 
-  // Fallback to OG tags if no API IDs found
-  if (!shopId || !itemId) {
-    return await scrapeGeneric(url, "shopee");
+  // Extract name from URL slug (always useful as fallback)
+  const slugName = extractShopeeNameFromUrl(url);
+
+  // Try Shopee API if we have IDs
+  if (shopId && itemId) {
+    try {
+      const apiUrl = `https://shopee.com.br/api/v4/item/get?itemid=${itemId}&shopid=${shopId}`;
+      const res = await fetch(apiUrl, {
+        headers: {
+          "User-Agent": randomUA(),
+          "Referer": "https://shopee.com.br/",
+          "Accept": "application/json",
+          "X-Shopee-Language": "pt-BR",
+        },
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        const item = json?.data;
+        if (item?.name) {
+          return {
+            name: item.name,
+            price: item.price ? (item.price / 100000).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : null,
+            image: item.image ? `https://down-br.img.susercontent.com/file/${item.image}` : null,
+            description: item.description?.substring(0, 400) ?? null,
+            url,
+            source: "shopee",
+          };
+        }
+      } else {
+        await res.text(); // consume body
+      }
+    } catch { /* API blocked, continue to fallbacks */ }
   }
 
+  // Try HTML/OG scraping
   try {
-    const apiUrl = `https://shopee.com.br/api/v4/item/get?itemid=${itemId}&shopid=${shopId}`;
-    const res = await fetch(apiUrl, {
-      headers: {
-        "User-Agent": randomUA(),
-        "Referer": "https://shopee.com.br/",
-        "Accept": "application/json",
-        "X-Shopee-Language": "pt-BR",
-      },
-    });
+    const html = await fetchHtml(url);
+    const ogTitle = metaContent(html, "og:title");
+    const ogImage = metaContent(html, "og:image");
+    const ogDesc = metaContent(html, "og:description");
+    const price = metaContent(html, "product:price:amount") || metaContent(html, "og:price:amount") || extractPrice(html);
 
-    const json = await res.json();
-    const item = json?.data;
-    if (!item) return await scrapeGeneric(url, "shopee");
+    const name = ogTitle
+      ? ogTitle.replace(/\s*\|\s*Shopee\s*Brasil.*/i, "").replace(/\s*-\s*Shopee\s*Brasil.*/i, "").trim()
+      : null;
 
-    return {
-      name: item.name ?? "Nome do produto",
-      price: item.price ? (item.price / 100000).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : null,
-      image: item.image ? `https://down-br.img.susercontent.com/file/${item.image}` : null,
-      description: item.description?.substring(0, 400) ?? null,
-      url,
-      source: "shopee",
-    };
+    if (name && name.length > 5) {
+      return {
+        name: decodeHtmlEntities(name).substring(0, 200),
+        price,
+        image: ogImage ?? null,
+        description: ogDesc?.substring(0, 400) ?? null,
+        url,
+        source: "shopee",
+      };
+    }
+  } catch { /* HTML fetch blocked */ }
+
+  // Final fallback: extract from URL slug
+  return {
+    name: slugName,
+    price: null,
+    image: null,
+    description: null,
+    url,
+    source: "shopee",
+    fallback: true,
+  };
+}
+
+function extractShopeeNameFromUrl(url: string): string {
+  try {
+    const path = new URL(url).pathname;
+    // Shopee URLs: /Product-Name-i.shopId.itemId
+    const slug = path.split("/").filter(Boolean)[0] ?? "";
+    // Remove the i.DIGITS.DIGITS suffix
+    const cleaned = slug.replace(/-i\.\d+\.\d+.*$/, "");
+    if (cleaned.length < 3) return "Nome do produto";
+    const name = decodeURIComponent(cleaned)
+      .replace(/[-_]/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+      .trim();
+    return name || "Nome do produto";
   } catch {
-    return await scrapeGeneric(url, "shopee");
+    return "Nome do produto";
   }
 }
 
@@ -319,7 +377,7 @@ async function scrapeAmazon(url: string) {
 
   if (url.includes('amazon.com.br') || url.includes('amazon.com')) {
     if (!name) name = html.match(/id="productTitle"[^>]*>\s*([^<]+)/)?.[1]?.trim();
-    if (!price) price = html.match(/class="a-price-whole">([^<]+)/)?.[1];
+    if (!price) price = html.match(/class="a-price-whole">([^<]+)/)?.[1] ?? null;
     if (!image) {
       image = html.match(/id="landingImage"[^>]*data-old-hires="([^"]+)"/)?.[1] ||
               html.match(/id="imgBlkFront"[^>]*src="([^"]+)"/)?.[1];
